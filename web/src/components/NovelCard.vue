@@ -8,6 +8,7 @@ const router = useRouter()
 
 const wordCount = computed(() => calcTotalCharCount(props.novel))
 const displayTags = computed(() => props.novel.novelBaseData.tags.slice(0, 3))
+const extraTagCount = computed(() => Math.max(0, props.novel.novelBaseData.tags.length - 3))
 
 function goRead() {
   router.push(`/novel/${props.novel.id}/read`)
@@ -37,6 +38,9 @@ function goEdit() {
       <div v-if="displayTags.length" style="display: flex; gap: 4px; flex-wrap: wrap;">
         <n-tag v-for="tag in displayTags" :key="tag" size="tiny" round>
           {{ tag }}
+        </n-tag>
+        <n-tag v-if="extraTagCount" size="tiny" round type="info">
+          +{{ extraTagCount }}
         </n-tag>
       </div>
 

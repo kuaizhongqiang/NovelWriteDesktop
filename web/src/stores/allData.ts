@@ -12,17 +12,21 @@ import { novelsApi, writingStylesApi, isLoggedIn } from '@/api'
 
 export const useAllDataStore = defineStore('allData', () => {
   // ============ State ============
-  const initialData = loadFromStorage() ?? { novels: [] as Novel[], writingStyles: [] as WritingStyle[] }
-  if (!initialData.writingStyles) initialData.writingStyles = []
+  const initialData = loadFromStorage() ?? { version: 1, novels: [] as Novel[], writingStyles: [] as WritingStyle[] }
   const data = ref<AllData>(initialData)
 
   const syncEnabled = ref(isLoggedIn())
 
-  // ============ Persistence ============
+  // ============ Persistence (debounced) ============
+  let saveTimer: ReturnType<typeof setTimeout> | null = null
   watch(
     data,
     (val: AllData) => {
-      saveToStorage(val)
+      if (saveTimer) clearTimeout(saveTimer)
+      saveTimer = setTimeout(() => {
+        saveToStorage(val)
+        saveTimer = null
+      }, 500)
     },
     { deep: true },
   )

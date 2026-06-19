@@ -78,9 +78,31 @@ router.get('/:id', (req: Request, res: Response) => {
   res.json(rowToNovel(row))
 })
 
+// ============ 输入校验 ============
+
+function validateNovelInput(body: any): string | null {
+  if (body.title !== undefined && typeof body.title === 'string' && body.title.length > 200) {
+    return 'Title must be 200 characters or less'
+  }
+  if (body.novelBaseData?.description && body.novelBaseData.description.length > 10000) {
+    return 'Description must be 10000 characters or less'
+  }
+  if (body.chapterList?.chapters) {
+    for (const ch of body.chapterList.chapters) {
+      if (ch.content && ch.content.length > 500_000) {
+        return 'Each chapter content must be 500KB or less'
+      }
+    }
+  }
+  return null
+}
+
 // ============ POST /api/novels — 新建 ============
 
 router.post('/', (req: Request, res: Response) => {
+  const validationError = validateNovelInput(req.body)
+  if (validationError) { res.status(400).json({ error: validationError }); return }
+
   const db = getDb()
   const now = nowISO()
   const id = createId()
@@ -108,6 +130,9 @@ router.post('/', (req: Request, res: Response) => {
 // ============ PUT /api/novels/:id — 更新 ============
 
 router.put('/:id', (req: Request, res: Response) => {
+  const validationError = validateNovelInput(req.body)
+  if (validationError) { res.status(400).json({ error: validationError }); return }
+
   const db = getDb()
   const row = execGet(db, `SELECT * FROM novels WHERE id = '${sq((req.params.id as string))}'`)
   if (!row) { res.status(404).json({ error: 'Novel not found' }); return }

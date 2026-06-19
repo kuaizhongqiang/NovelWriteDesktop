@@ -1,7 +1,10 @@
 // ============ 小说写作战 — 前端类型定义 ============
 // 映射自 Data.cs
 
+export const CURRENT_DATA_VERSION = 1
+
 export interface AllData {
+  version: number
   novels: Novel[]
   writingStyles: WritingStyle[]
 }
@@ -144,13 +147,20 @@ export function calcChapterCount(novel: Novel): number {
 const STORAGE_KEY = 'novelwrite-all-data'
 
 /**
- * 从 localStorage 加载数据
+ * 从 localStorage 加载数据（含版本迁移）
  */
 export function loadFromStorage(): AllData | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return null
     const parsed = JSON.parse(raw) as AllData
+
+    // 版本 0 → 1: 补充缺失字段
+    if (!parsed.version) {
+      if (!parsed.writingStyles) parsed.writingStyles = []
+      parsed.version = 1
+    }
+
     // 将日期字符串还原为 Date 对象
     parsed.novels.forEach(n => {
       n.created = new Date(n.created)

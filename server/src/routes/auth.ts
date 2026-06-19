@@ -38,7 +38,7 @@ function updateLastUsed(id: string): void {
 
 // ============ 认证中间件 ============
 
-const PUBLIC_PATHS = ['/api/health', '/api/auth/login']
+const PUBLIC_PATHS = ['/', '/api/health', '/api/auth/login']
 
 export function authMiddleware(req: Request, res: Response, next: NextFunction): void {
   if (PUBLIC_PATHS.includes(req.path)) {

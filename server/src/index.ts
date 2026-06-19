@@ -1,7 +1,8 @@
 import express from 'express'
 import cors from 'cors'
+import rateLimit from 'express-rate-limit'
 import dotenv from 'dotenv'
-import { initDb } from './db/index.js'
+import { initDb, persistDb } from './db/index.js'
 import { authMiddleware } from './routes/auth.js'
 import authRouter from './routes/auth.js'
 import novelRoutes from './routes/novels.js'
@@ -17,12 +18,31 @@ async function main() {
 
   const app = express()
 
+  // Rate limiting
+  const generalLimiter = rateLimit({
+    windowMs: 60_000,
+    max: 120,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too many requests' },
+  })
+  const aiLimiter = rateLimit({
+    windowMs: 60_000,
+    max: 10,
+    message: { error: 'AI rate limit exceeded' },
+  })
+
   // Middleware
   app.use(cors({ origin: CORS_ORIGIN, credentials: true }))
   app.use(express.json({ limit: '10mb' }))
+  app.use(generalLimiter)
   app.use(authMiddleware)
 
   // Routes
+  app.get('/', (_req, res) => {
+    res.json({ name: 'NovelWrite Server', version: '0.1.1-alpha', status: 'running' })
+  })
+
   app.get('/api/health', (_req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() })
   })
@@ -37,9 +57,22 @@ async function main() {
     res.status(500).json({ error: err.message || 'Internal server error' })
   })
 
+  // 自动落盘：每 30s 将内存数据写入磁盘
+  const persistInterval = setInterval(() => persistDb(), 30_000)
+
+  // 优雅关闭
+  const shutdown = () => {
+    clearInterval(persistInterval)
+    persistDb()
+    process.exit(0)
+  }
+  process.on('SIGINT', shutdown)
+  process.on('SIGTERM', shutdown)
+
   app.listen(PORT, () => {
     console.log(`NovelWrite server running on http://localhost:${PORT}`)
     console.log(`CORS origin: ${CORS_ORIGIN}`)
+    console.log(`Auto-persist: every 30s`)
   })
 }
 
