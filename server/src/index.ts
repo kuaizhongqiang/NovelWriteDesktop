@@ -38,23 +38,24 @@ async function main() {
     message: { error: 'AI rate limit exceeded' },
   })
 
-  // Middleware
+  // 中间件（顺序很重要）
   app.use(cors({ origin: CORS_ORIGIN, credentials: true }))
   app.use(express.json({ limit: '10mb' }))
   app.use(generalLimiter)
+
+  // 静态文件（在 auth 之前，公开访问）
+  app.use(express.static(webDist))
+
+  // Auth 中间件（API 路由需要认证）
   app.use(authMiddleware)
 
-  // API 路由（优先于静态文件）
+  // API 路由
   app.get('/api/health', (_req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() })
   })
-
   app.use('/api/auth', authRouter)
   app.use('/api/novels', novelRoutes)
   app.use('/api/writing-styles', writingStyleRoutes)
-
-  // 前端静态文件
-  app.use(express.static(webDist))
 
   // SPA fallback: 非 API 请求返回 index.html
   app.get('*', (req, res) => {
