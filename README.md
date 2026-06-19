@@ -2,22 +2,49 @@
 
 小说写作平台 —— 桌面端 Web 应用
 
+## 快速开始
+
+### 通过 npm 安装服务端
+
+```bash
+# 安装服务端
+npm install -g novelwrite-server@alpha
+
+# 初始化数据库
+novelwrite init
+
+# 生成 API Key
+novelwrite auth generate my-key
+
+# 启动服务
+novelwrite-server
+```
+
+### 本地开发
+
+```bash
+# 前端
+cd web
+npm install
+npm run dev          # http://localhost:5173
+
+# 服务端
+cd server
+npm install
+cp .env.example .env  # 填入 DEEPSEEK_API_KEY
+npm run cli init
+npm run cli auth generate dev-key
+npm run dev           # http://localhost:3002
+```
+
 ## 项目结构
 
 ```text
 NovelWriteDesktop/
 ├── web/          # 前端（Vue 3 + Vite + TypeScript + Naive UI）
-├── server/       # 服务端（待开发）
+├── server/       # 服务端（Node.js + Express + SQLite）
+├── docs/         # 设计文档
 └── README.md
-```
-
-## 前端开发
-
-```bash
-cd web
-npm install        # 已配置代理，v2ray 端口 10808
-npm run dev        # 开发模式，默认 http://localhost:5173
-npm run build      # 生产构建
 ```
 
 ## 文档
@@ -39,12 +66,19 @@ npm run build      # 生产构建
 | UI 组件库  | Naive UI                          |
 | 状态管理   | Pinia ✅ 已集成                    |
 | 路由       | Vue Router ✅ 已集成               |
-| 服务端     | Node.js + Express + SQLite（待开发） |
+| 服务端     | Node.js + Express + SQLite        |
 
 ## 开发状态
 
 - [x] 前端原型 — 7 个页面全部完成
 - [x] 设计文档 — 产品设计 + 服务端架构
-- [ ] 服务端 — SQLite + REST API + CLI
-- [ ] AI Agent — DeepSeek + Tool Calling
-- [ ] Alpha 发布 — GitHub Release + npm
+- [x] 服务端 — SQLite + REST API + CLI ✅ v0.1.0-alpha 已发布
+- [ ] AI Agent — DeepSeek + Tool Calling（下一阶段）
+- [x] Alpha 发布 — [GitHub Release](https://github.com/kuaizhongqiang/NovelWriteDesktop/releases) + [npm](https://www.npmjs.com/package/novelwrite-server)
+
+## 发布渠道
+
+| 渠道 | 命令 |
+|------|------|
+| npm | `npm install -g novelwrite-server@alpha` |
+| GitHub | [releases](https://github.com/kuaizhongqiang/NovelWriteDesktop/releases) |
