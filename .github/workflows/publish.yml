@@ -21,7 +21,7 @@ jobs:
         working-directory: web
 
       - name: Copy frontend to server
-        run: cp -r web/dist server/static
+        run: mkdir -p server/static && cp -r web/dist/* server/static/
 
       - name: Build server
         run: |
