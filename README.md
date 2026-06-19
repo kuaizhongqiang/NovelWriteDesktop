@@ -25,6 +25,8 @@ novelwrite-server
 
 ### 本地开发
 
+> 本地开发需要梯子时：`npm config set proxy http://127.0.0.1:10808 && npm config set https-proxy http://127.0.0.1:10808`
+
 ```bash
 # 前端
 cd web
