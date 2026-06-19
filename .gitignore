@@ -10,3 +10,4 @@ dist
 server/node_modules
 server/dist
 *.db
+server.log
