@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import type { Novel } from '@/types'
-import { calcTotalWordCount } from '@/types'
+import { calcTotalCharCount } from '@/types'
 import { useRouter } from 'vue-router'
 
 const props = defineProps<{ novel: Novel }>()
 const router = useRouter()
 
-const wordCount = computed(() => calcTotalWordCount(props.novel))
+const wordCount = computed(() => calcTotalCharCount(props.novel))
 const displayTags = computed(() => props.novel.novelBaseData.tags.slice(0, 3))
 
 function goRead() {

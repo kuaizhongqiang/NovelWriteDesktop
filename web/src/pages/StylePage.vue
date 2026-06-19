@@ -2,7 +2,7 @@
 import { useRouter } from 'vue-router'
 import { useNovel } from '@/composables/useNovel'
 import { useAllDataStore } from '@/stores/allData'
-import { createDefaultWritingStyle, type WritingStyle } from '@/types'
+import { createId, createDefaultWritingStyle, type WritingStyle } from '@/types'
 
 const { novel } = useNovel()
 const store = useAllDataStore()
@@ -54,7 +54,7 @@ function savePreset() {
   if (editingState.value === 'new') {
     // 新建
     const preset: WritingStyle = {
-      id: crypto.randomUUID(),
+      id: createId(),
       name: editingForm.name,
       charPerChapter: { min: editingForm.minChars, max: editingForm.maxChars },
       fullStoryLength: editingForm.fullStoryLength,

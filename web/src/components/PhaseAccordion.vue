@@ -23,6 +23,7 @@ watch(
     data.title = t
     data.description = d
   },
+  { immediate: true },
 )
 
 function syncPhase() {

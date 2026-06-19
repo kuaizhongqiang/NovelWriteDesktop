@@ -128,9 +128,9 @@ export function createDefaultNovel(): Novel {
 }
 
 /**
- * 计算小说的总字数（所有章节 content 长度之和）
+ * 计算小说的总字符数（所有章节 content 长度之和，中文字符计数）
  */
-export function calcTotalWordCount(novel: Novel): number {
+export function calcTotalCharCount(novel: Novel): number {
   return novel.chapterList.chapters.reduce((sum, ch) => sum + ch.content.length, 0)
 }
 
