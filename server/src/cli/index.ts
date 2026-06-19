@@ -249,6 +249,8 @@ novel
   .description('删除小说')
   .action(async (id: string, opts: { json?: boolean }) => {
     await withDb(db => {
+      const existing = getNovelById(db, id)
+      if (!existing) { console.error('Novel not found'); process.exit(1) }
       db.run(`DELETE FROM novels WHERE id = '${sqEscape(id)}'`)
       if (opts.json) {
         outputJSON({ deleted: id })

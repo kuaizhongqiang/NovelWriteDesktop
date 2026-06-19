@@ -67,6 +67,7 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
   }
 
   updateLastUsed(key.id)
+  persistDb()
   next()
 }
 
