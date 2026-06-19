@@ -11,8 +11,10 @@ export default defineConfig({
     vue(),
     vueJsx(),
     AutoImport({
+      dts: 'src/auto-imports.d.ts',
       imports: [
         'vue',
+        'pinia',
         {
           'naive-ui': [
             'useDialog',
@@ -24,6 +26,7 @@ export default defineConfig({
       ],
     }),
     Components({
+      dts: 'src/components.d.ts',
       resolvers: [NaiveUiResolver()],
     }),
   ],

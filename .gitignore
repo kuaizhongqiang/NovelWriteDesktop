@@ -1,5 +1,3 @@
 node_modules
 dist
 *.local
-auto-imports.d.ts
-components.d.ts
