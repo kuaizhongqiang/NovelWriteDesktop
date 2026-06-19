@@ -8,13 +8,15 @@ import {
   loadFromStorage,
   saveToStorage,
 } from '@/types'
+import { novelsApi, writingStylesApi, isLoggedIn } from '@/api'
 
 export const useAllDataStore = defineStore('allData', () => {
   // ============ State ============
   const initialData = loadFromStorage() ?? { novels: [] as Novel[], writingStyles: [] as WritingStyle[] }
-  // 兼容旧数据：缺少 writingStyles 时补上
   if (!initialData.writingStyles) initialData.writingStyles = []
   const data = ref<AllData>(initialData)
+
+  const syncEnabled = ref(isLoggedIn())
 
   // ============ Persistence ============
   watch(
@@ -25,6 +27,18 @@ export const useAllDataStore = defineStore('allData', () => {
     { deep: true },
   )
 
+  // ============ Helpers ============
+
+  /** 后端同步（静默失败，不阻塞用户操作） */
+  async function syncToServer(fn: () => Promise<any>): Promise<void> {
+    if (!syncEnabled.value) return
+    try {
+      await fn()
+    } catch {
+      // 静默失败——前端继续使用 localStorage
+    }
+  }
+
   // ============ Getters ============
   function getNovelById(id: string): Novel | undefined {
     return data.value.novels.find((n: Novel) => n.id === id)
@@ -34,14 +48,13 @@ export const useAllDataStore = defineStore('allData', () => {
 
   // ============ Novel Actions ============
   function addNovel(): Novel {
-    // 确保至少有一个预设
     if (data.value.writingStyles.length === 0) {
       data.value.writingStyles.push(createDefaultWritingStyle())
     }
     const novel = createDefaultNovel()
-    // 将第一部小说的风格关联到第一个预设
     novel.writingStyle = { ...data.value.writingStyles[0] }
     data.value.novels.push(novel)
+    syncToServer(() => novelsApi.create(novel))
     return novel
   }
 
@@ -50,6 +63,7 @@ export const useAllDataStore = defineStore('allData', () => {
     if (idx !== -1) {
       data.value.novels.splice(idx, 1)
     }
+    syncToServer(() => novelsApi.delete(id))
   }
 
   function updateNovel(id: string, partial: Partial<Novel>): void {
@@ -57,6 +71,7 @@ export const useAllDataStore = defineStore('allData', () => {
     if (novel) {
       Object.assign(novel, partial, { updated: new Date() })
     }
+    syncToServer(() => novelsApi.update(id, partial))
   }
 
   function saveNow(): void {
@@ -65,27 +80,26 @@ export const useAllDataStore = defineStore('allData', () => {
 
   // ============ Writing Style Preset Actions ============
 
-  /** 新建预设 */
   function addWritingStylePreset(style?: WritingStyle): WritingStyle {
     const preset = style ?? createDefaultWritingStyle()
     data.value.writingStyles.push(preset)
+    syncToServer(() => writingStylesApi.create(preset))
     return preset
   }
 
-  /** 删除预设 */
   function deleteWritingStylePreset(id: string): void {
     data.value.writingStyles = data.value.writingStyles.filter(s => s.id !== id)
+    syncToServer(() => writingStylesApi.delete(id))
   }
 
-  /** 更新预设 */
   function updateWritingStylePreset(id: string, partial: Partial<WritingStyle>): void {
     const preset = data.value.writingStyles.find(s => s.id === id)
     if (preset) {
       Object.assign(preset, partial)
     }
+    syncToServer(() => writingStylesApi.update(id, partial))
   }
 
-  /** 将小说的风格关联到指定预设（复制预设值到小说） */
   function applyPresetToNovel(novelId: string, presetId: string): void {
     const preset = data.value.writingStyles.find(s => s.id === presetId)
     const novel = getNovelById(novelId)
@@ -95,18 +109,24 @@ export const useAllDataStore = defineStore('allData', () => {
     }
   }
 
+  /** 切换后端同步状态 */
+  function setSyncEnabled(enabled: boolean): void {
+    syncEnabled.value = enabled
+  }
+
   return {
     data,
+    syncEnabled,
     getNovelById,
     novelCount,
     addNovel,
     deleteNovel,
     updateNovel,
     saveNow,
-    // preset 管理
     addWritingStylePreset,
     deleteWritingStylePreset,
     updateWritingStylePreset,
     applyPresetToNovel,
+    setSyncEnabled,
   }
 })
