@@ -13,10 +13,22 @@ jobs:
         with:
           node-version: 22
           registry-url: https://registry.npmjs.org
-      - run: npm install
+
+      - name: Build frontend
+        run: |
+          npm install
+          npm run build
+        working-directory: web
+
+      - name: Copy frontend to server
+        run: cp -r web/dist server/static
+
+      - name: Build server
+        run: |
+          npm install
+          npm run build
         working-directory: server
-      - run: npm run build
-        working-directory: server
+
       - name: Determine npm tag
         id: tag
         working-directory: server
@@ -24,10 +36,12 @@ jobs:
           VERSION=$(node -p "require('./package.json').version")
           if [[ "$VERSION" == *-* ]]; then echo "NPM_TAG=alpha" >> $GITHUB_OUTPUT
           else echo "NPM_TAG=latest" >> $GITHUB_OUTPUT; fi
-      - run: npm publish --access public --tag ${{ steps.tag.outputs.NPM_TAG }}
+
+      - name: Publish to npm
+        run: npm publish --access public --tag ${{ steps.tag.outputs.NPM_TAG }}
         working-directory: server
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
       - name: Verify
-        working-directory: server
         run: npm view novelwrite-server@${{ steps.tag.outputs.NPM_TAG }} version

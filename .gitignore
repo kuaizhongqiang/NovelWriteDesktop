@@ -9,6 +9,7 @@ dist
 # Server
 server/node_modules
 server/dist
+server/static
 *.db
 server.log
 .npmrc

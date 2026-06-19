@@ -15,9 +15,9 @@ dotenv.config()
 const PORT = parseInt(process.env.PORT || '3002', 10)
 const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:5173'
 
-// 前端构建产物路径 (server/../web/dist)
+// 前端构建产物路径 (相对于 server/dist/)
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
-const webDist = path.resolve(__dirname, '../../web/dist')
+const webDist = path.resolve(__dirname, '../static')
 
 async function main() {
   await initDb()

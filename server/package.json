@@ -6,9 +6,19 @@
     "novelwrite": "./bin/novelwrite.js",
     "novelwrite-server": "./bin/novelwrite-server.js"
   },
+  "files": [
+    "dist",
+    "static",
+    "bin",
+    "package.json",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
+    "build:frontend": "cd ../web && npm run build && cp -r dist ../server/static",
+    "prepublishOnly": "npm run build:frontend && npm run build",
     "start": "node dist/index.js",
     "cli": "tsx src/cli/index.ts"
   },
