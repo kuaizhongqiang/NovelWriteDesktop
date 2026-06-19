@@ -9,9 +9,6 @@ on:
 jobs:
   web:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: web
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -19,15 +16,15 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: web/package-lock.json
-      - run: npm ci
+      - run: npm install
+        working-directory: web
       - run: npx vue-tsc -b
+        working-directory: web
       - run: npm run build
+        working-directory: web
 
   server:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: server
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -35,6 +32,9 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: server/package-lock.json
-      - run: npm ci
+      - run: npm install
+        working-directory: server
       - run: npx tsc --noEmit
+        working-directory: server
       - run: npm run build
+        working-directory: server
