@@ -3,6 +3,10 @@
   "version": "0.1.0-alpha",
   "private": true,
   "type": "module",
+  "bin": {
+    "novelwrite": "./bin/novelwrite.js",
+    "novelwrite-server": "./bin/novelwrite-server.js"
+  },
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc",

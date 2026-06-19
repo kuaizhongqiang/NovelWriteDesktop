@@ -794,7 +794,7 @@ program
   })
 
 // ============ 运行 ============
-const isMainModule = process.argv[1]?.includes('cli')
+const isMainModule = process.argv[1]?.includes('cli') || process.argv[1]?.includes('novelwrite')
 if (isMainModule) {
   program.parse(process.argv)
 }
