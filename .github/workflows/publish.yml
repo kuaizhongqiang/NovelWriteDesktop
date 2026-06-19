@@ -13,9 +13,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          registry-url: https://registry.npmjs.org
 
-      - run: npm install
+      - run: rm -f package-lock.json && npm install --force
         working-directory: server
 
       - run: npm run build
@@ -26,11 +25,8 @@ jobs:
         working-directory: server
         run: |
           VERSION=$(node -p "require('./package.json').version")
-          if [[ "$VERSION" == *-* ]]; then
-            echo "NPM_TAG=alpha" >> $GITHUB_OUTPUT
-          else
-            echo "NPM_TAG=latest" >> $GITHUB_OUTPUT
-          fi
+          if [[ "$VERSION" == *-* ]]; then echo "NPM_TAG=alpha" >> $GITHUB_OUTPUT
+          else echo "NPM_TAG=latest" >> $GITHUB_OUTPUT; fi
 
       - run: npm publish --access public --tag ${{ steps.tag.outputs.NPM_TAG }}
         working-directory: server
