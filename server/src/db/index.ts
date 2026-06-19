@@ -6,12 +6,35 @@ import { createAllTables } from './schema.js'
 let db: SqlJsDatabase | null = null
 let dbPath: string = ''
 
+const CONFIG_DIR = path.join(process.env.HOME || process.env.USERPROFILE || '.', '.novelwrite')
+const CONFIG_FILE = path.join(CONFIG_DIR, 'config.json')
+
+function getStoredDbPath(): string | null {
+  try {
+    if (fs.existsSync(CONFIG_FILE)) {
+      const cfg = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf-8'))
+      return cfg.dbPath || null
+    }
+  } catch { /* ignore */ }
+  return null
+}
+
+function storeDbPath(p: string): void {
+  try {
+    if (!fs.existsSync(CONFIG_DIR)) fs.mkdirSync(CONFIG_DIR, { recursive: true })
+    fs.writeFileSync(CONFIG_FILE, JSON.stringify({ dbPath: path.resolve(p) }, null, 2))
+  } catch { /* ignore */ }
+}
+
 /**
  * 初始化数据库连接（异步，sql.js 需要加载 WASM）
  * 首次调用时创建表结构
  */
 export async function initDb(filePath?: string): Promise<SqlJsDatabase> {
-  dbPath = filePath || process.env.NOVELWRITE_DB_PATH || './novelwrite.db'
+  dbPath = filePath || getStoredDbPath() || process.env.NOVELWRITE_DB_PATH || './novelwrite.db'
+
+  // 如果传入了路径，保存到配置
+  if (filePath) storeDbPath(filePath)
 
   const SQL = await initSqlJs()
 

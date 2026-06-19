@@ -1,6 +1,6 @@
 {
   "name": "novelwrite-server",
-  "version": "0.1.6-alpha",
+  "version": "0.1.7-alpha",
   "type": "module",
   "bin": {
     "novelwrite": "./bin/novelwrite.js",
