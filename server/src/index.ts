@@ -1,6 +1,8 @@
 import express from 'express'
 import cors from 'cors'
 import rateLimit from 'express-rate-limit'
+import path from 'path'
+import { fileURLToPath } from 'url'
 import dotenv from 'dotenv'
 import { initDb, persistDb } from './db/index.js'
 import { authMiddleware } from './routes/auth.js'
@@ -12,6 +14,10 @@ dotenv.config()
 
 const PORT = parseInt(process.env.PORT || '3002', 10)
 const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:5173'
+
+// 前端构建产物路径 (server/../web/dist)
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const webDist = path.resolve(__dirname, '../../web/dist')
 
 async function main() {
   await initDb()
@@ -38,11 +44,7 @@ async function main() {
   app.use(generalLimiter)
   app.use(authMiddleware)
 
-  // Routes
-  app.get('/', (_req, res) => {
-    res.json({ name: 'NovelWrite Server', version: '0.1.1-alpha', status: 'running' })
-  })
-
+  // API 路由（优先于静态文件）
   app.get('/api/health', (_req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() })
   })
@@ -50,6 +52,18 @@ async function main() {
   app.use('/api/auth', authRouter)
   app.use('/api/novels', novelRoutes)
   app.use('/api/writing-styles', writingStyleRoutes)
+
+  // 前端静态文件
+  app.use(express.static(webDist))
+
+  // SPA fallback: 非 API 请求返回 index.html
+  app.get('*', (req, res) => {
+    if (req.path.startsWith('/api/')) {
+      res.status(404).json({ error: 'Not found' })
+      return
+    }
+    res.sendFile(path.join(webDist, 'index.html'))
+  })
 
   // Error handler
   app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
@@ -72,6 +86,7 @@ async function main() {
   app.listen(PORT, () => {
     console.log(`NovelWrite server running on http://localhost:${PORT}`)
     console.log(`CORS origin: ${CORS_ORIGIN}`)
+    console.log(`Static files: ${webDist}`)
     console.log(`Auto-persist: every 30s`)
   })
 }
