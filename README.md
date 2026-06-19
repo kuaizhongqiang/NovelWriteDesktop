@@ -1,5 +1,8 @@
 # NovelWrite Desktop
 
+[![CI](https://github.com/kuaizhongqiang/NovelWriteDesktop/actions/workflows/ci.yml/badge.svg)](https://github.com/kuaizhongqiang/NovelWriteDesktop/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/novelwrite-server?label=npm)](https://www.npmjs.com/package/novelwrite-server)
+
 小说写作平台 —— 桌面端 Web 应用
 
 ## 快速开始
