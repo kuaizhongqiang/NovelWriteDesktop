@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useRoute, useRouter } from 'vue-router'
 import { useTheme } from '@/composables/useTheme'
+import AgentBar from '@/components/AgentBar.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -9,6 +10,7 @@ const { isDark, toggleTheme } = useTheme()
 const agentCollapsed = ref(false)
 
 const novelId = computed(() => route.params.id as string | undefined)
+const currentPage = computed(() => route.name as string | undefined)
 
 const navItems = computed(() => {
   const id = novelId.value
@@ -73,26 +75,12 @@ function handleNavClick(item: { to: string; enabled: boolean }) {
       </n-layout-content>
 
       <!-- Agent Bar -->
-      <n-layout-sider
-        bordered
-        :width="220"
-        :collapsed-width="36"
+      <AgentBar
         :collapsed="agentCollapsed"
-        show-trigger="bar"
-        @collapse="agentCollapsed = true"
-        @expand="agentCollapsed = false"
-      >
-        <div style="padding: 16px; display: flex; align-items: center; gap: 8px;">
-          <span style="font-size: 18px;">🤖</span>
-          <span v-if="!agentCollapsed" style="font-size: 14px; font-weight: 600;">
-            AI Agent
-          </span>
-        </div>
-        <div v-if="!agentCollapsed" style="padding: 0 16px; color: #888; font-size: 13px;">
-          <p>AI 助手面板</p>
-          <p style="margin-top: 8px;">（待开发）</p>
-        </div>
-      </n-layout-sider>
+        :novel-id="novelId"
+        :current-page="currentPage"
+        @toggle="agentCollapsed = !agentCollapsed"
+      />
     </n-layout>
   </n-layout>
 </template>

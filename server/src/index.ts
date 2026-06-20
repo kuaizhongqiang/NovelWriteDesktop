@@ -9,6 +9,7 @@ import { authMiddleware } from './routes/auth.js'
 import authRouter from './routes/auth.js'
 import novelRoutes from './routes/novels.js'
 import writingStyleRoutes from './routes/writingStyles.js'
+import aiRoutes from './routes/ai.js'
 
 dotenv.config()
 
@@ -81,6 +82,7 @@ async function main() {
   app.use('/api/auth', authRouter)
   app.use('/api/novels', novelRoutes)
   app.use('/api/writing-styles', writingStyleRoutes)
+  app.use('/api/ai', aiLimiter, aiRoutes)
 
   // SPA fallback: 非 API 请求返回 index.html
   app.get('*', (req, res) => {

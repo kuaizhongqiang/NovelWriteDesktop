@@ -12,6 +12,7 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
+    AgentBar: typeof import('./components/AgentBar.vue')['default']
     NAlert: typeof import('naive-ui')['NAlert']
     NButton: typeof import('naive-ui')['NButton']
     NButtonGroup: typeof import('naive-ui')['NButtonGroup']
@@ -54,6 +55,7 @@ declare module 'vue' {
 
 // For TSX support
 declare global {
+  const AgentBar: typeof import('./components/AgentBar.vue')['default']
   const NAlert: typeof import('naive-ui')['NAlert']
   const NButton: typeof import('naive-ui')['NButton']
   const NButtonGroup: typeof import('naive-ui')['NButtonGroup']
