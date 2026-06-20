@@ -145,15 +145,32 @@ export function calcChapterCount(novel: Novel): number {
 }
 
 const STORAGE_KEY = 'novelwrite-all-data'
+const ENC_PREFIX = 'enc:v1:' // 加密存储的前缀标记
 
 /**
- * 从 localStorage 加载数据（含版本迁移）
+ * 从 localStorage 加载数据（含版本迁移, 支持加密）
  */
-export function loadFromStorage(): AllData | null {
+export async function loadFromStorage(): Promise<AllData | null> {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return null
-    const parsed = JSON.parse(raw) as AllData
+
+    let jsonStr: string
+
+    if (raw.startsWith(ENC_PREFIX)) {
+      // 加密数据 —— 尝试用会话密钥解密
+      const { decryptJson, isUnlocked, tryRestoreFromSession } = await import('@/utils/crypto')
+      if (!isUnlocked()) {
+        const restored = await tryRestoreFromSession()
+        if (!restored) return null // 未解锁，无法读取
+      }
+      jsonStr = await decryptJson(raw.slice(ENC_PREFIX.length))
+    } else {
+      // 明文数据
+      jsonStr = raw
+    }
+
+    const parsed = JSON.parse(jsonStr) as AllData
 
     // 版本 0 → 1: 补充缺失字段
     if (!parsed.version) {
@@ -173,8 +190,16 @@ export function loadFromStorage(): AllData | null {
 }
 
 /**
- * 保存数据到 localStorage
+ * 保存数据到 localStorage（若已解锁则加密存储）
  */
-export function saveToStorage(data: AllData): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
+export async function saveToStorage(data: AllData): Promise<void> {
+  const jsonStr = JSON.stringify(data)
+
+  const { isUnlocked, encryptJson } = await import('@/utils/crypto')
+  if (isUnlocked()) {
+    const ciphertext = await encryptJson(jsonStr)
+    localStorage.setItem(STORAGE_KEY, `${ENC_PREFIX}${ciphertext}`)
+  } else {
+    localStorage.setItem(STORAGE_KEY, jsonStr)
+  }
 }

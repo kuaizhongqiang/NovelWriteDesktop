@@ -2,7 +2,6 @@
 import { useRouter } from 'vue-router'
 import { useNovel } from '@/composables/useNovel'
 import { useAllDataStore } from '@/stores/allData'
-import type { RoleData } from '@/types'
 import RoleEditor from '@/components/RoleEditor.vue'
 
 const { novelId, novel } = useNovel()
@@ -11,37 +10,19 @@ const router = useRouter()
 const message = useMessage()
 
 function addFemaleRole() {
-  if (!novel.value) return
-  const newRole: RoleData = {
-    roleName: '',
-    roleDescription: '',
-    relationshipToMainRole: '',
-  }
-  novel.value.roleList.femaleRoles.push(newRole)
-  store.saveNow()
+  store.addFemaleRole(novelId.value)
 }
 
 function removeFemaleRole(index: number) {
-  if (!novel.value) return
-  novel.value.roleList.femaleRoles.splice(index, 1)
-  store.saveNow()
+  store.removeFemaleRole(novelId.value, index)
 }
 
 function addSupportingRole() {
-  if (!novel.value) return
-  const newRole: RoleData = {
-    roleName: '',
-    roleDescription: '',
-    relationshipToMainRole: '',
-  }
-  novel.value.roleList.supportingRoles.push(newRole)
-  store.saveNow()
+  store.addSupportingRole(novelId.value)
 }
 
 function removeSupportingRole(index: number) {
-  if (!novel.value) return
-  novel.value.roleList.supportingRoles.splice(index, 1)
-  store.saveNow()
+  store.removeSupportingRole(novelId.value, index)
 }
 
 function handleSave() {

@@ -31,6 +31,20 @@ const presetOptions = computed(() =>
   })),
 )
 
+// 表单验证规则
+const rules = {
+  title: [
+    { required: true, message: '请输入小说标题', trigger: 'blur' },
+    { max: 100, message: '标题不超过 100 字', trigger: 'blur' },
+  ],
+  genre: [
+    { max: 20, message: '题材不超过 20 字', trigger: 'blur' },
+  ],
+  oneWord: [
+    { max: 200, message: '一句话概括不超过 200 字', trigger: 'blur' },
+  ],
+}
+
 // 当 novel 加载后，初始化表单
 watch(
   novel,
@@ -63,7 +77,7 @@ function handlePresetChange(presetId: string) {
   message.success(`已关联风格「${preset?.name}」`)
 }
 
-function handleSave() {
+async function handleSave() {
   if (novel.value) {
     store.updateNovel(novelId.value, {
       novelBaseData: { ...form.value },
@@ -81,12 +95,17 @@ function handleCancel() {
   <div v-if="novel" style="max-width: 720px;">
     <n-h2>小说基础设定</n-h2>
 
-    <n-form label-placement="top" style="margin-top: 16px;">
-      <n-form-item label="标题">
+    <n-form
+      :model="novel"
+      :rules="rules"
+      label-placement="top"
+      style="margin-top: 16px;"
+    >
+      <n-form-item label="标题" path="title">
         <n-input v-model:value="novel.title" placeholder="输入小说标题" />
       </n-form-item>
 
-      <n-form-item label="题材">
+      <n-form-item label="题材" path="genre">
         <n-input v-model:value="form.genre" placeholder="如：奇幻、都市、科幻..." />
       </n-form-item>
 
@@ -122,7 +141,7 @@ function handleCancel() {
         />
       </n-form-item>
 
-      <n-form-item label="一句话概括">
+      <n-form-item label="一句话概括" path="oneWord">
         <n-input v-model:value="form.oneWord" placeholder="用一句话概括你的小说" />
       </n-form-item>
 

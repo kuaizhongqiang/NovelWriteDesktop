@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Novel } from '@/types'
+import { getFlatChapterTree } from '@/composables/useChapterTree'
 
 const props = defineProps<{
   show: boolean
@@ -17,35 +18,7 @@ function handleSelect(chapterId: string) {
   emit('close')
 }
 
-const tocChapters = computed(() => {
-  const result: { phaseTitle: string; chapterId: string; title: string; sort: number }[] = []
-
-  for (const phase of props.novel.outline.outlinePhases) {
-    for (const ch of phase.chapterOutlines) {
-      result.push({
-        phaseTitle: phase.title,
-        chapterId: ch.id,
-        title: ch.chapterTitle || `第${ch.sort}章`,
-        sort: ch.sort,
-      })
-    }
-  }
-
-  // 也加入不在大纲中的章节
-  for (const ch of props.novel.chapterList.chapters) {
-    if (!result.find(r => r.chapterId === ch.id)) {
-      result.push({
-        phaseTitle: '',
-        chapterId: ch.id,
-        title: `第${ch.sort}章`,
-        sort: ch.sort,
-      })
-    }
-  }
-
-  result.sort((a, b) => a.sort - b.sort)
-  return result
-})
+const tocChapters = computed(() => getFlatChapterTree(props.novel))
 </script>
 
 <template>
@@ -64,9 +37,9 @@ const tocChapters = computed(() => {
       <div style="padding: 8px 0; max-height: 60vh; overflow-y: auto;">
         <div
           v-for="ch in tocChapters"
-          :key="ch.chapterId"
-          :class="['toc-item', { active: ch.chapterId === currentChapterId }]"
-          @click="handleSelect(ch.chapterId)"
+          :key="ch.id"
+          :class="['toc-item', { active: ch.id === currentChapterId }]"
+          @click="handleSelect(ch.id)"
         >
           <span v-if="ch.phaseTitle" style="font-size: 11px; color: #999; margin-right: 4px;">
             [{{ ch.phaseTitle }}]
@@ -87,14 +60,14 @@ const tocChapters = computed(() => {
   justify-content: center;
   align-items: flex-start;
   padding-top: 80px;
-  background: rgba(0, 0, 0, 0.3);
+  background: var(--nw-overlay);
 }
 .toc-panel {
   width: 360px;
   max-width: 90vw;
-  background: #fff;
+  background: var(--nw-card-bg);
   border-radius: 8px;
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 24px var(--nw-shadow);
   overflow: hidden;
 }
 .toc-item {
@@ -102,13 +75,14 @@ const tocChapters = computed(() => {
   cursor: pointer;
   font-size: 14px;
   transition: background 0.15s;
+  color: var(--nw-text);
 }
 .toc-item:hover {
-  background: #f5f5f5;
+  background: var(--nw-bg-hover);
 }
 .toc-item.active {
-  background: #e8f0fe;
-  color: #1a73e8;
+  background: var(--nw-bg-active);
+  color: var(--nw-accent);
   font-weight: 500;
 }
 </style>

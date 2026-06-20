@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import type { RoleData } from '@/types'
+import { useAllDataStore } from '@/stores/allData'
+import { useNovel } from '@/composables/useNovel'
 
 const props = defineProps<{
   roleData: RoleData
@@ -11,7 +13,10 @@ const emit = defineEmits<{
   delete: []
 }>()
 
-// 本地响应式副本——直接修改传入的对象，但为了防止删除后引用丢失，用 data 同步
+const store = useAllDataStore()
+const { novelId } = useNovel()
+
+// 本地响应式副本
 const data = reactive<RoleData>({
   roleName: props.roleData.roleName,
   roleDescription: props.roleData.roleDescription,
@@ -31,7 +36,7 @@ watch(
 )
 
 function syncToParent() {
-  Object.assign(props.roleData, {
+  store.updateMainRole(novelId.value, {
     roleName: data.roleName,
     roleDescription: data.roleDescription,
     relationshipToMainRole: data.relationshipToMainRole,

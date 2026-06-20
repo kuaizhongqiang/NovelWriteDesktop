@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Novel } from '@/types'
+import { getChaptersNotInPhase } from '@/composables/useChapterTree'
 
 const props = defineProps<{
   novel: Novel
@@ -10,20 +11,9 @@ const emit = defineEmits<{
   selectChapter: [chapterId: string]
 }>()
 
-// 收集所有已在 Phase 中的章节 ID
-const phaseChapterIds = computed(() => {
-  const ids = new Set<string>()
-  for (const phase of props.novel.outline.outlinePhases) {
-    for (const ch of phase.chapterOutlines) {
-      ids.add(ch.id)
-    }
-  }
-  return ids
-})
-
 // 不在任何 Phase 中的章节（避免重复显示）
 const chaptersNotInPhase = computed(() => {
-  return props.novel.chapterList.chapters.filter(ch => !phaseChapterIds.value.has(ch.id))
+  return getChaptersNotInPhase(props.novel)
 })
 
 function handleClick(chapterId: string) {
@@ -59,7 +49,7 @@ function handleClick(chapterId: string) {
       </div>
     </template>
 
-    <!-- 不在任何 Phase 中的章节（独立创建，不重复显示） -->
+    <!-- 不在任何 Phase 中的章节 -->
     <div v-if="chaptersNotInPhase.length > 0" style="margin-top: 8px;">
       <div style="font-weight: 600; font-size: 13px; padding: 4px 8px; color: #666;">
         其他章节
@@ -88,21 +78,22 @@ function handleClick(chapterId: string) {
   border-radius: 4px;
   font-size: 13px;
   transition: background 0.15s;
+  color: var(--nw-text);
 }
 .tree-item:hover {
-  background: #f5f5f5;
+  background: var(--nw-bg-hover);
 }
 .tree-item.active {
-  background: #e8f0fe;
-  color: #1a73e8;
+  background: var(--nw-bg-active);
+  color: var(--nw-accent);
   font-weight: 500;
 }
 .tree-dot {
   font-size: 8px;
-  color: #aaa;
+  color: var(--nw-text-light);
   flex-shrink: 0;
 }
 .tree-item.active .tree-dot {
-  color: #1a73e8;
+  color: var(--nw-accent);
 }
 </style>

@@ -31,36 +31,16 @@ const activeChapterTitle = computed(() => {
 
 // 选择章节时的处理
 function selectChapter(chapterId: string) {
-  // 检查当前是否有未保存的更改（简单处理：直接切换）
-  // 如果章节不存在于 chapterList 中，自动创建
   if (novel.value) {
-    let ch = novel.value.chapterList.chapters.find(c => c.id === chapterId)
-    if (!ch) {
-      // 从大纲中找信息创建章节
-      let sort = 1
-      for (const phase of novel.value.outline.outlinePhases) {
-        const outlineCh = phase.chapterOutlines.find(co => co.id === chapterId)
-        if (outlineCh) {
-          sort = outlineCh.sort
-          break
-        }
-      }
-      ch = {
-        id: chapterId,
-        sort,
-        content: '',
-      }
-      novel.value.chapterList.chapters.push(ch)
-      // 按 sort 排序
-      novel.value.chapterList.chapters.sort((a, b) => a.sort - b.sort)
-    }
+    // 自动创建章节（如果尚不存在）
+    store.addChapterToNovel(novelId.value, chapterId)
   }
   activeChapterId.value = chapterId
 }
 
 function handleSave(content: string) {
   if (!novel.value || !activeChapter.value) return
-  activeChapter.value.content = content
+  store.updateChapterContent(novelId.value, activeChapter.value.id, content)
   store.updateNovel(novelId.value, {
     chapterList: { ...novel.value.chapterList },
   })

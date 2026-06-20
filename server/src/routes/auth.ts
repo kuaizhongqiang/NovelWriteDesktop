@@ -1,6 +1,7 @@
 import { Router, type Request, type Response, type NextFunction } from 'express'
 import crypto from 'crypto'
-import { getDb, persistDb } from '../db/index.js'
+import { getDb } from '../db/index.js'
+import { queryFirst } from '../db/query.js'
 
 const router = Router()
 
@@ -16,24 +17,25 @@ function generateApiKey(): string {
   return API_KEY_PREFIX + crypto.randomBytes(32).toString('hex')
 }
 
-// ============ sql.js 参数化查询辅助 ============
+// ============ 参数化查询 ============
 
-function findKeyByHash(keyHash: string): { id: string; name: string; revoked: number } | null {
-  const db = getDb()
-  const stmt = db.prepare('SELECT id, name, revoked FROM auth_keys WHERE key_hash = ?')
-  stmt.bind([keyHash])
-  if (stmt.step()) {
-    const row = stmt.getAsObject() as { id: string; name: string; revoked: number }
-    stmt.free()
-    return row
-  }
-  stmt.free()
-  return null
+interface AuthKeyRow {
+  id: string
+  name: string
+  revoked: number
+  [key: string]: unknown
+}
+
+function findKeyByHash(keyHash: string): AuthKeyRow | null {
+  return queryFirst<AuthKeyRow>(
+    'SELECT id, name, revoked FROM auth_keys WHERE key_hash = ?',
+    [keyHash],
+  )
 }
 
 function updateLastUsed(id: string): void {
   const db = getDb()
-  db.run(`UPDATE auth_keys SET last_used_at = datetime('now') WHERE id = '${id}'`)
+  db.run("UPDATE auth_keys SET last_used_at = datetime('now') WHERE id = ?", [id])
 }
 
 // ============ 认证中间件 ============
@@ -66,8 +68,8 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
     return
   }
 
+  // 更新最后使用时间（不持久化——由 30s 定时器兜底）
   updateLastUsed(key.id)
-  persistDb()
   next()
 }
 
@@ -94,7 +96,6 @@ router.post('/login', (req: Request, res: Response) => {
   }
 
   updateLastUsed(keyData.id)
-  persistDb()
 
   res.json({ ok: true, id: keyData.id, name: keyData.name })
 })

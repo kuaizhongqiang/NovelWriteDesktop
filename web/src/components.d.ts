@@ -12,6 +12,7 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
+    NAlert: typeof import('naive-ui')['NAlert']
     NButton: typeof import('naive-ui')['NButton']
     NButtonGroup: typeof import('naive-ui')['NButtonGroup']
     NCard: typeof import('naive-ui')['NCard']
@@ -33,10 +34,12 @@ declare module 'vue' {
     NLayoutHeader: typeof import('naive-ui')['NLayoutHeader']
     NLayoutSider: typeof import('naive-ui')['NLayoutSider']
     NMessageProvider: typeof import('naive-ui')['NMessageProvider']
+    NModal: typeof import('naive-ui')['NModal']
     NNotificationProvider: typeof import('naive-ui')['NNotificationProvider']
     NovelCard: typeof import('./components/NovelCard.vue')['default']
     NSelect: typeof import('naive-ui')['NSelect']
     NSpace: typeof import('naive-ui')['NSpace']
+    NSpin: typeof import('naive-ui')['NSpin']
     NTag: typeof import('naive-ui')['NTag']
     OutlineTree: typeof import('./components/OutlineTree.vue')['default']
     PhaseAccordion: typeof import('./components/PhaseAccordion.vue')['default']
@@ -45,11 +48,13 @@ declare module 'vue' {
     RouterView: typeof import('vue-router')['RouterView']
     TextEditor: typeof import('./components/TextEditor.vue')['default']
     TocPanel: typeof import('./components/TocPanel.vue')['default']
+    UnlockDialog: typeof import('./components/UnlockDialog.vue')['default']
   }
 }
 
 // For TSX support
 declare global {
+  const NAlert: typeof import('naive-ui')['NAlert']
   const NButton: typeof import('naive-ui')['NButton']
   const NButtonGroup: typeof import('naive-ui')['NButtonGroup']
   const NCard: typeof import('naive-ui')['NCard']
@@ -71,10 +76,12 @@ declare global {
   const NLayoutHeader: typeof import('naive-ui')['NLayoutHeader']
   const NLayoutSider: typeof import('naive-ui')['NLayoutSider']
   const NMessageProvider: typeof import('naive-ui')['NMessageProvider']
+  const NModal: typeof import('naive-ui')['NModal']
   const NNotificationProvider: typeof import('naive-ui')['NNotificationProvider']
   const NovelCard: typeof import('./components/NovelCard.vue')['default']
   const NSelect: typeof import('naive-ui')['NSelect']
   const NSpace: typeof import('naive-ui')['NSpace']
+  const NSpin: typeof import('naive-ui')['NSpin']
   const NTag: typeof import('naive-ui')['NTag']
   const OutlineTree: typeof import('./components/OutlineTree.vue')['default']
   const PhaseAccordion: typeof import('./components/PhaseAccordion.vue')['default']
@@ -83,4 +90,5 @@ declare global {
   const RouterView: typeof import('vue-router')['RouterView']
   const TextEditor: typeof import('./components/TextEditor.vue')['default']
   const TocPanel: typeof import('./components/TocPanel.vue')['default']
+  const UnlockDialog: typeof import('./components/UnlockDialog.vue')['default']
 }

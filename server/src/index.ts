@@ -38,7 +38,32 @@ async function main() {
     message: { error: 'AI rate limit exceeded' },
   })
 
-  // 中间件（顺序很重要）
+  // 安全中间件（顺序很重要）
+  app.use((_req, res, next) => {
+    // CSP: 限制资源加载来源，防止 XSS
+    res.setHeader(
+      'Content-Security-Policy',
+      [
+        "default-src 'self'",
+        "script-src 'self'",
+        "style-src 'self' 'unsafe-inline'",
+        "img-src 'self' data:",
+        "font-src 'self'",
+        "connect-src 'self'",
+        "frame-ancestors 'none'",
+        "base-uri 'self'",
+        "form-action 'self'",
+      ].join('; '),
+    )
+    // 其他安全头
+    res.setHeader('X-Content-Type-Options', 'nosniff')
+    res.setHeader('X-Frame-Options', 'DENY')
+    res.setHeader('X-XSS-Protection', '0') // 已废弃但兼容旧浏览器
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin')
+    res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()')
+    next()
+  })
+
   app.use(cors({ origin: CORS_ORIGIN, credentials: true }))
   app.use(express.json({ limit: '10mb' }))
   app.use(generalLimiter)

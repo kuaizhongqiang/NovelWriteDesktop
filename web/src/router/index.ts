@@ -54,4 +54,40 @@ const router = createRouter({
   routes,
 })
 
+// ============ 全局导航守卫：未保存更改提示 ============
+
+/**
+ * 注册脏页面检查器。页面在数据变更时调用 setDirty(true)，
+ * 保存完成后调用 setDirty(false)。路由离开时如有脏数据则弹窗确认。
+ */
+let _isDirty = false
+
+export function setNavigationDirty(dirty: boolean) {
+  _isDirty = dirty
+}
+
+export function isNavigationDirty(): boolean {
+  return _isDirty
+}
+
+router.beforeEach((_to, _from) => {
+  if (_isDirty) {
+    // 使用 window.confirm 作为简单提示（后续可升级为 Naive UI 对话框）
+    const ok = window.confirm('有未保存的更改，确定离开吗？')
+    if (!ok) return false
+    _isDirty = false
+  }
+  return true
+})
+
+// 浏览器关闭/刷新提示
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeunload', (e) => {
+    if (_isDirty) {
+      e.preventDefault()
+      e.returnValue = ''
+    }
+  })
+}
+
 export default router

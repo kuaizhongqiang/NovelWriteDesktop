@@ -4,21 +4,23 @@
 
 本项目使用 `agent-memory` MCP（TencentDB Agent Memory Bridge）进行对话记忆管理。
 
-### 自动存储规则
+### MCP 服务器配置
 
-每次回复结束时，**必须**调用 `store_memory` MCP 工具，将本轮对话存入记忆：
+MCP 服务器配置在 `~/.claude/settings.json`（全局配置，不入库），项目本身不存储任何凭据。
 
-- `user_content`: 用户的输入内容
-- `assistant_content`: 我的完整回复内容
-- `session_key`: 不传，让 MCP 自动管理
+> `SENDER=claude-code` 限定本域为编码分析域，与 `codebuddy`（编码调试）、`openclaw`（日常对话）隔离，互不干扰。
 
-### 按需召回
+### 可用 MCP 工具
 
-当上下文不清晰、或需要回顾之前的讨论时，主动调用：
+| 工具 | 用途 |
+| --- | --- |
+| `recall_memory(query)` | 按语义召回相关记忆（自动限定本 sender 域） |
+| `search_memories(query)` | 语义搜索记忆（支持 `limit`、`type`、`scene` 过滤） |
+| `store_memory` | 存储对话 |
+| `end_session` | 结束当前会话 |
 
-- `recall_memory(query)` — 召回相关记忆
-- `search_memories(query)` — 语义搜索记忆
+### 使用规则
 
-### 结束会话
-
-对话自然结束时，调用 `end_session()` 结束当前记忆会话。
+- **按需召回**：当上下文不清晰、或需要回顾之前的讨论时，主动调用 `recall_memory` 或 `search_memories`
+- **不自动存储**：仅按你的指令存储记忆，不主动调用 `store_memory`
+- **结束会话**：对话自然结束时，调 `end_session()`

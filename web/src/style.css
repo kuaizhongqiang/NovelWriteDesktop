@@ -15,3 +15,42 @@ html, body {
 #app {
   height: 100%;
 }
+
+/* ============ 主题 CSS 变量（与 Naive UI 主题联动） ============ */
+
+:root {
+  --nw-bg: #fff;
+  --nw-bg-secondary: #f5f5f5;
+  --nw-bg-hover: #f5f5f5;
+  --nw-bg-active: #e8f0fe;
+  --nw-text: #333;
+  --nw-text-secondary: #666;
+  --nw-text-muted: #888;
+  --nw-text-light: #999;
+  --nw-border: #eee;
+  --nw-border-light: #eee;
+  --nw-accent: #1a73e8;
+  --nw-accent-light: #e8f0fe;
+  --nw-shadow: rgba(0, 0, 0, 0.15);
+  --nw-overlay: rgba(0, 0, 0, 0.3);
+  --nw-card-bg: #fff;
+}
+
+/* 暗色模式覆盖（通过 Naive UI 的 html 类切换） */
+html.dark {
+  --nw-bg: #1e1e1e;
+  --nw-bg-secondary: #2a2a2a;
+  --nw-bg-hover: #333;
+  --nw-bg-active: #1a3a5c;
+  --nw-text: #ccc;
+  --nw-text-secondary: #aaa;
+  --nw-text-muted: #888;
+  --nw-text-light: #666;
+  --nw-border: #333;
+  --nw-border-light: #333;
+  --nw-accent: #5b9bd5;
+  --nw-accent-light: #1a3a5c;
+  --nw-shadow: rgba(0, 0, 0, 0.4);
+  --nw-overlay: rgba(0, 0, 0, 0.5);
+  --nw-card-bg: #252525;
+}

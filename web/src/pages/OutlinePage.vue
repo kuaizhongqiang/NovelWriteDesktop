@@ -2,7 +2,6 @@
 import { useRouter } from 'vue-router'
 import { useNovel } from '@/composables/useNovel'
 import { useAllDataStore } from '@/stores/allData'
-import { createId, type OutlinePhase } from '@/types'
 import PhaseAccordion from '@/components/PhaseAccordion.vue'
 
 const { novelId, novel } = useNovel()
@@ -30,28 +29,17 @@ watch(
 )
 
 function syncOutline() {
-  if (!novel.value) return
-  novel.value.outline.mainRoleSuperpower = form.mainRoleSuperpower
-  novel.value.outline.worldView = form.worldView
-  novel.value.outline.writingKeyPoints = form.writingKeyPoints
+  store.updateOutlineField(novelId.value, 'mainRoleSuperpower', form.mainRoleSuperpower)
+  store.updateOutlineField(novelId.value, 'worldView', form.worldView)
+  store.updateOutlineField(novelId.value, 'writingKeyPoints', form.writingKeyPoints)
 }
 
 function addPhase() {
-  if (!novel.value) return
-  const phase: OutlinePhase = {
-    id: createId(),
-    sort: novel.value.outline.outlinePhases.length + 1,
-    title: '',
-    description: '',
-    chapterOutlines: [],
-  }
-  novel.value.outline.outlinePhases.push(phase)
+  store.addPhaseToNovel(novelId.value)
 }
 
 function removePhase(index: number) {
-  if (!novel.value) return
-  novel.value.outline.outlinePhases.splice(index, 1)
-  novel.value.outline.outlinePhases.forEach((p, i) => { p.sort = i + 1 })
+  store.removePhaseFromNovel(novelId.value, index)
 }
 
 function handleSave() {
@@ -74,14 +62,20 @@ function handleCancel() {
     <n-h2>大纲设定</n-h2>
 
     <n-form label-placement="top">
-      <n-form-item label="主角金手指">
+      <n-form-item
+        label="主角金手指"
+        :rule="[{ max: 200, message: '不超过 200 字', trigger: 'blur' }]"
+      >
         <n-input
           v-model:value="form.mainRoleSuperpower"
           placeholder="如：重生、系统、异能..."
           @update:value="syncOutline"
         />
       </n-form-item>
-      <n-form-item label="世界观">
+      <n-form-item
+        label="世界观"
+        :rule="[{ max: 2000, message: '不超过 2000 字', trigger: 'blur' }]"
+      >
         <n-input
           v-model:value="form.worldView"
           type="textarea"
@@ -90,7 +84,10 @@ function handleCancel() {
           @update:value="syncOutline"
         />
       </n-form-item>
-      <n-form-item label="写作要点">
+      <n-form-item
+        label="写作要点"
+        :rule="[{ max: 2000, message: '不超过 2000 字', trigger: 'blur' }]"
+      >
         <n-input
           v-model:value="form.writingKeyPoints"
           type="textarea"

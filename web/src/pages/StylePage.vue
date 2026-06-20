@@ -149,7 +149,10 @@ function handleCancel() {
       style="margin-top: 16px;"
     >
       <n-form label-placement="top">
-        <n-form-item label="预设名称">
+        <n-form-item
+          label="预设名称"
+          :rule="[{ required: true, message: '请输入预设名称', trigger: 'blur' }]"
+        >
           <n-input v-model:value="editingForm.name" placeholder="如：短篇快节奏、史诗慢热..." />
         </n-form-item>
         <n-form-item label="每章字数范围">

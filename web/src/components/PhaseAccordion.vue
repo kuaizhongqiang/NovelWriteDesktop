@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import type { OutlinePhase, ChapterOutline } from '@/types'
-import { createId } from '@/types'
+import type { OutlinePhase } from '@/types'
+import { useAllDataStore } from '@/stores/allData'
+import { useNovel } from '@/composables/useNovel'
 
 const props = defineProps<{
   phase: OutlinePhase
@@ -10,6 +11,9 @@ const props = defineProps<{
 const emit = defineEmits<{
   delete: []
 }>()
+
+const store = useAllDataStore()
+const { novelId } = useNovel()
 
 // 本地编辑
 const data = reactive({
@@ -27,24 +31,18 @@ watch(
 )
 
 function syncPhase() {
-  props.phase.title = data.title
-  props.phase.description = data.description
+  store.updatePhase(novelId.value, props.phase.id, {
+    title: data.title,
+    description: data.description,
+  })
 }
 
 function addChapterOutline() {
-  const ch: ChapterOutline = {
-    id: createId(),
-    sort: props.phase.chapterOutlines.length + 1,
-    chapterTitle: '',
-    chapterDescription: '',
-    hook: '',
-  }
-  props.phase.chapterOutlines.push(ch)
+  store.addChapterOutlineToPhase(novelId.value, props.phase.id)
 }
 
 function removeChapterOutline(index: number) {
-  props.phase.chapterOutlines.splice(index, 1)
-  props.phase.chapterOutlines.forEach((ch, i) => { ch.sort = i + 1 })
+  store.removeChapterOutlineFromPhase(novelId.value, props.phase.id, index)
 }
 </script>
 
@@ -97,21 +95,23 @@ function removeChapterOutline(index: number) {
               placeholder="章节标题"
               size="small"
               style="flex: 1;"
+              @update:value="store.updateChapterOutline(novelId, phase.id, ch.id, { chapterTitle: ch.chapterTitle })"
             />
             <n-button text type="error" size="tiny" @click="removeChapterOutline(idx)">✕</n-button>
           </div>
-          <!-- 顺序：章节大纲（描述）在前，钩子在后 -->
           <n-input
             v-model:value="ch.chapterDescription"
             type="textarea"
             :autosize="{ minRows: 1, maxRows: 3 }"
             placeholder="章节大纲描述..."
             size="small"
+            @update:value="store.updateChapterOutline(novelId, phase.id, ch.id, { chapterDescription: ch.chapterDescription })"
           />
           <n-input
             v-model:value="ch.hook"
             placeholder="钩子 / 悬念"
             size="small"
+            @update:value="store.updateChapterOutline(novelId, phase.id, ch.id, { hook: ch.hook })"
           />
         </div>
       </div>

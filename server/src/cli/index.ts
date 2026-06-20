@@ -4,6 +4,7 @@ import crypto from 'crypto'
 import fs from 'fs'
 import path from 'path'
 import { initDb, getDb, closeDb } from '../db/index.js'
+import { queryFirst, queryAll, execute } from '../db/query.js'
 import { createId, nowISO } from '../types/index.js'
 
 // ============ 工具函数 ============
@@ -15,10 +16,6 @@ function hashKey(key: string): string {
 
 function generateApiKey(): string {
   return API_KEY_PREFIX + crypto.randomBytes(32).toString('hex')
-}
-
-function sqEscape(s: string): string {
-  return s.replace(/'/g, "''")
 }
 
 function parseNovelRow(row: Record<string, any>) {
@@ -42,14 +39,37 @@ async function withDb(action: (db: any) => void): Promise<void> {
   try { action(getDb()) } finally { closeDb() }
 }
 
-function getNovelById(db: any, id: string): Record<string, any> | null {
-  const rows = db.exec(`SELECT * FROM novels WHERE id = '${sqEscape(id)}'`)
-  if (!rows[0]?.values?.length) { return null }
-  const cols = rows[0].columns
-  const vals = rows[0].values[0]
-  const row: Record<string, any> = {}
-  cols.forEach((c: string, i: number) => { row[c] = vals[i] })
-  return parseNovelRow(row)
+function getNovelById(id: string): Record<string, any> | null {
+  const row = queryFirst(
+    'SELECT * FROM novels WHERE id = ?',
+    [id],
+  )
+  return row ? parseNovelRow(row) : null
+}
+
+/** 更新小说的 JSON 列，在事务中读取→修改→写回 */
+function patchNovelJSON(novelId: string, field: string, mutator: (data: any) => any): void {
+  const db = getDb()
+  db.run('BEGIN')
+  try {
+    const stmt = db.prepare(`SELECT ${field} FROM novels WHERE id = ?`)
+    stmt.bind([novelId])
+    if (!stmt.step()) {
+      stmt.free()
+      db.run('ROLLBACK')
+      throw new Error('Novel not found')
+    }
+    const row = stmt.getAsObject() as Record<string, string>
+    const current = JSON.parse(row[field] || '{}')
+    const updated = mutator(current)
+    db.run(`UPDATE novels SET ${field} = ?, updated = datetime('now') WHERE id = ?`, [
+      JSON.stringify(updated), novelId,
+    ])
+    db.run('COMMIT')
+  } catch (err) {
+    db.run('ROLLBACK')
+    throw err
+  }
 }
 
 // ============ Commander ============
@@ -79,12 +99,14 @@ auth
   .option('-j, --json', 'JSON 输出')
   .description('生成新的 API Key')
   .action(async (name: string, opts: { json?: boolean }) => {
-    await withDb(db => {
+    await withDb(() => {
       const rawKey = generateApiKey()
       const keyHash = hashKey(rawKey)
       const id = createId()
-      db.run(`INSERT INTO auth_keys (id, name, key_hash, created_at, last_used_at, revoked)
-        VALUES ('${id}', '${sqEscape(name)}', '${keyHash}', datetime('now'), NULL, 0)`)
+      execute(
+        'INSERT INTO auth_keys (id, name, key_hash, created_at, last_used_at, revoked) VALUES (?, ?, ?, datetime(\'now\'), NULL, 0)',
+        [id, name, keyHash],
+      )
       if (opts.json) {
         outputJSON({ id, name, key: rawKey })
       } else {
@@ -98,11 +120,10 @@ auth
   .option('-j, --json', 'JSON 输出')
   .description('列出所有 API Key')
   .action(async (opts: { json?: boolean }) => {
-    await withDb(db => {
-      const rows = db.exec('SELECT id, name, created_at, last_used_at, revoked FROM auth_keys ORDER BY created_at DESC')
-      const results = (rows[0]?.values ?? []).map((v: any[]) => ({
-        id: v[0], name: v[1], createdAt: v[2], lastUsedAt: v[3], revoked: Boolean(v[4]),
-      }))
+    await withDb(() => {
+      const results = queryAll<{ id: string; name: string; created_at: string; last_used_at: string | null; revoked: number }>(
+        'SELECT id, name, created_at, last_used_at, revoked FROM auth_keys ORDER BY created_at DESC',
+      )
       if (opts.json) {
         outputJSON(results)
         return
@@ -113,7 +134,7 @@ auth
       }
       for (const k of results) {
         console.log(`[${k.revoked ? '🔴 Revoked' : '🟢 Active'}] ${k.name} (${k.id.slice(0, 8)}...)`)
-        console.log(`      Created: ${k.createdAt} | Last used: ${k.lastUsedAt ?? 'never'}`)
+        console.log(`      Created: ${k.created_at} | Last used: ${k.last_used_at ?? 'never'}`)
       }
     })
   })
@@ -124,8 +145,8 @@ auth
   .option('-j, --json', 'JSON 输出')
   .description('吊销 API Key')
   .action(async (id: string, opts: { json?: boolean }) => {
-    await withDb(db => {
-      db.run(`UPDATE auth_keys SET revoked = 1 WHERE id = '${sqEscape(id)}'`)
+    await withDb(() => {
+      execute('UPDATE auth_keys SET revoked = 1 WHERE id = ?', [id])
       if (opts.json) {
         outputJSON({ revoked: id })
       } else {
@@ -142,12 +163,14 @@ novel
   .option('-j, --json', 'JSON 输出')
   .description('列出所有小说')
   .action(async (opts: { json?: boolean }) => {
-    await withDb(db => {
-      const rows = db.exec('SELECT id, title, chapter_list, created, updated, is_open FROM novels ORDER BY updated DESC')
-      const items = (rows[0]?.values ?? []).map((v: any[]) => {
-        const cl = JSON.parse(v[2] || '{}')
+    await withDb(() => {
+      const rows = queryAll<{ id: string; title: string; chapter_list: string; created: string; updated: string; is_open: number }>(
+        'SELECT id, title, chapter_list, created, updated, is_open FROM novels ORDER BY updated DESC',
+      )
+      const items = rows.map(r => {
+        const cl = JSON.parse(r.chapter_list || '{}')
         const words = (cl.chapters || []).reduce((s: number, ch: any) => s + (ch.content?.length || 0), 0)
-        return { id: v[0], title: v[1], wordCount: words, chapterCount: (cl.chapters || []).length, created: v[3], updated: v[4], isOpen: Boolean(v[5]) }
+        return { id: r.id, title: r.title, wordCount: words, chapterCount: (cl.chapters || []).length, created: r.created, updated: r.updated, isOpen: Boolean(r.is_open) }
       })
       if (opts.json) {
         outputJSON(items)
@@ -165,14 +188,11 @@ novel
   .option('-j, --json', 'JSON 输出')
   .description('获取小说完整数据')
   .action(async (id: string, opts: { json?: boolean }) => {
-    await withDb(db => {
-      const n = getNovelById(db, id)
+    await withDb(() => {
+      const n = getNovelById(id)
       if (!n) { console.error('Novel not found'); process.exit(1) }
-      if (opts.json) {
-        outputJSON(n)
-      } else {
-        console.log(JSON.stringify(n, null, 2))
-      }
+      if (opts.json) { outputJSON(n) }
+      else { console.log(JSON.stringify(n, null, 2)) }
     })
   })
 
@@ -182,32 +202,25 @@ novel
   .option('-j, --json', 'JSON 输出')
   .description('创建新小说')
   .action(async (title: string, opts: { json?: boolean }) => {
-    await withDb(db => {
+    await withDb(() => {
       const now = nowISO()
-      const n = {
-        id: createId(), title,
-        novelBaseData: { description: '', oneWord: '', genre: '', tags: [] },
-        roleList: { mainRole: { roleName: '', roleDescription: '', relationshipToMainRole: '自身' }, femaleRoles: [], supportingRoles: [] },
-        outline: { mainRoleSuperpower: '', worldView: '', writingKeyPoints: '', outlinePhases: [] },
-        chapterList: { chapters: [] },
-        writingStyle: { id: createId(), name: '默认风格', charPerChapter: { min: 1000, max: 3000 }, fullStoryLength: 100000, baseTone: '' },
-        created: now, updated: now, isOpen: true,
-      }
-      const d = {
-        id: n.id, title: sqEscape(n.title),
-        novel_base_data: sqEscape(JSON.stringify(n.novelBaseData)),
-        role_list: sqEscape(JSON.stringify(n.roleList)),
-        outline: sqEscape(JSON.stringify(n.outline)),
-        chapter_list: sqEscape(JSON.stringify(n.chapterList)),
-        writing_style: sqEscape(JSON.stringify(n.writingStyle)),
-        created: n.created, updated: n.updated, is_open: n.isOpen ? '1' : '0',
-      }
-      db.run(`INSERT INTO novels VALUES ('${d.id}','${d.title}','${d.novel_base_data}','${d.role_list}','${d.outline}','${d.chapter_list}','${d.writing_style}','${d.created}','${d.updated}',${d.is_open})`)
-      if (opts.json) {
-        outputJSON({ id: n.id, title })
-      } else {
-        console.log(`Created novel "${title}" (${n.id})`)
-      }
+      const id = createId()
+      const wsId = createId()
+      execute(
+        `INSERT INTO novels (id, title, novel_base_data, role_list, outline, chapter_list, writing_style, created, updated, is_open)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          id, title,
+          JSON.stringify({ description: '', oneWord: '', genre: '', tags: [] }),
+          JSON.stringify({ mainRole: { roleName: '', roleDescription: '', relationshipToMainRole: '自身' }, femaleRoles: [], supportingRoles: [] }),
+          JSON.stringify({ mainRoleSuperpower: '', worldView: '', writingKeyPoints: '', outlinePhases: [] }),
+          JSON.stringify({ chapters: [] }),
+          JSON.stringify({ id: wsId, name: '默认风格', charPerChapter: { min: 1000, max: 3000 }, fullStoryLength: 100000, baseTone: '' }),
+          now, now, 1,
+        ],
+      )
+      if (opts.json) { outputJSON({ id, title }) }
+      else { console.log(`Created novel "${title}" (${id})`) }
     })
   })
 
@@ -221,24 +234,22 @@ novel
   .option('-j, --json', 'JSON 输出')
   .description('更新小说基础设定')
   .action(async (id: string, opts: any) => {
-    await withDb(db => {
-      const n = getNovelById(db, id)
+    await withDb(() => {
+      const n = getNovelById(id)
       if (!n) { console.error('Novel not found'); process.exit(1) }
+
       if (opts.title) {
-        db.run(`UPDATE novels SET title = '${sqEscape(opts.title)}', updated = '${nowISO()}' WHERE id = '${sqEscape(id)}'`)
+        execute("UPDATE novels SET title = ?, updated = datetime('now') WHERE id = ?", [opts.title, id])
       }
       if (opts.genre || opts.tags || opts.description) {
-        const bd = n!.novelBaseData
+        const bd = n.novelBaseData
         if (opts.genre) { bd.genre = opts.genre }
         if (opts.tags) { bd.tags = opts.tags.split(',').map((t: string) => t.trim()) }
         if (opts.description) { bd.description = opts.description }
-        db.run(`UPDATE novels SET novel_base_data = '${sqEscape(JSON.stringify(bd))}', updated = '${nowISO()}' WHERE id = '${sqEscape(id)}'`)
+        execute("UPDATE novels SET novel_base_data = ?, updated = datetime('now') WHERE id = ?", [JSON.stringify(bd), id])
       }
-      if (opts.json) {
-        outputJSON({ updated: id })
-      } else {
-        console.log(`Novel ${id.slice(0, 8)}... updated.`)
-      }
+      if (opts.json) { outputJSON({ updated: id }) }
+      else { console.log(`Novel ${id.slice(0, 8)}... updated.`) }
     })
   })
 
@@ -248,15 +259,11 @@ novel
   .option('-j, --json', 'JSON 输出')
   .description('删除小说')
   .action(async (id: string, opts: { json?: boolean }) => {
-    await withDb(db => {
-      const existing = getNovelById(db, id)
-      if (!existing) { console.error('Novel not found'); process.exit(1) }
-      db.run(`DELETE FROM novels WHERE id = '${sqEscape(id)}'`)
-      if (opts.json) {
-        outputJSON({ deleted: id })
-      } else {
-        console.log(`Novel ${id.slice(0, 8)}... deleted.`)
-      }
+    await withDb(() => {
+      if (!getNovelById(id)) { console.error('Novel not found'); process.exit(1) }
+      execute('DELETE FROM novels WHERE id = ?', [id])
+      if (opts.json) { outputJSON({ deleted: id }) }
+      else { console.log(`Novel ${id.slice(0, 8)}... deleted.`) }
     })
   })
 
@@ -269,14 +276,11 @@ roles
   .option('-j, --json', 'JSON 输出')
   .description('获取角色列表')
   .action(async (novelId: string, opts: { json?: boolean }) => {
-    await withDb(db => {
-      const n = getNovelById(db, novelId)
+    await withDb(() => {
+      const n = getNovelById(novelId)
       if (!n) { console.error('Novel not found'); process.exit(1) }
-      if (opts.json) {
-        outputJSON(n.roleList)
-      } else {
-        console.log(JSON.stringify(n.roleList, null, 2))
-      }
+      if (opts.json) { outputJSON(n.roleList) }
+      else { console.log(JSON.stringify(n.roleList, null, 2)) }
     })
   })
 
@@ -290,26 +294,21 @@ roles
   .option('-j, --json', 'JSON 输出')
   .description('添加角色')
   .action(async (novelId: string, opts: any) => {
-    await withDb(db => {
-      const n = getNovelById(db, novelId)
+    await withDb(() => {
+      const n = getNovelById(novelId)
       if (!n) { console.error('Novel not found'); process.exit(1) }
-      const rl = n.roleList
       const role = { roleName: opts.name, roleDescription: opts.desc || '', relationshipToMainRole: opts.relation || '' }
-      if (opts.type === 'main') {
-        rl.mainRole = role
-      } else if (opts.type === 'female') {
-        rl.femaleRoles.push(role)
-      } else if (opts.type === 'supporting') {
-        rl.supportingRoles.push(role)
-      } else {
-        console.error('Invalid type. Use: main/female/supporting'); process.exit(1)
-      }
-      db.run(`UPDATE novels SET role_list = '${sqEscape(JSON.stringify(rl))}', updated = '${nowISO()}' WHERE id = '${sqEscape(novelId)}'`)
-      if (opts.json) {
-        outputJSON({ added: opts.type })
-      } else {
-        console.log(`Added ${opts.type} role: ${opts.name}`)
-      }
+
+      patchNovelJSON(novelId, 'role_list', (rl: any) => {
+        if (opts.type === 'main') { rl.mainRole = role }
+        else if (opts.type === 'female') { rl.femaleRoles.push(role) }
+        else if (opts.type === 'supporting') { rl.supportingRoles.push(role) }
+        else { throw new Error('Invalid type. Use: main/female/supporting') }
+        return rl
+      })
+
+      if (opts.json) { outputJSON({ added: opts.type }) }
+      else { console.log(`Added ${opts.type} role: ${opts.name}`) }
     })
   })
 
@@ -323,21 +322,22 @@ roles
   .option('-j, --json', 'JSON 输出')
   .description('更新角色')
   .action(async (novelId: string, opts: any) => {
-    await withDb(db => {
-      const n = getNovelById(db, novelId)
+    await withDb(() => {
+      const n = getNovelById(novelId)
       if (!n) { console.error('Novel not found'); process.exit(1) }
-      const allRoles = [n.roleList.mainRole, ...n.roleList.femaleRoles, ...n.roleList.supportingRoles]
-      const target = allRoles.find(r => r.roleName === opts.roleName)
-      if (!target) { console.error('Role not found'); process.exit(1) }
-      if (opts.name) { target.roleName = opts.name }
-      if (opts.desc) { target.roleDescription = opts.desc }
-      if (opts.relation) { target.relationshipToMainRole = opts.relation }
-      db.run(`UPDATE novels SET role_list = '${sqEscape(JSON.stringify(n.roleList))}', updated = '${nowISO()}' WHERE id = '${sqEscape(novelId)}'`)
-      if (opts.json) {
-        outputJSON({ updated: opts.roleName })
-      } else {
-        console.log(`Role updated: ${opts.roleName}`)
-      }
+
+      patchNovelJSON(novelId, 'role_list', (rl: any) => {
+        const allRoles = [rl.mainRole, ...rl.femaleRoles, ...rl.supportingRoles]
+        const target = allRoles.find((r: any) => r.roleName === opts.roleName)
+        if (!target) { throw new Error('Role not found') }
+        if (opts.name) { target.roleName = opts.name }
+        if (opts.desc) { target.roleDescription = opts.desc }
+        if (opts.relation) { target.relationshipToMainRole = opts.relation }
+        return rl
+      })
+
+      if (opts.json) { outputJSON({ updated: opts.roleName }) }
+      else { console.log(`Role updated: ${opts.roleName}`) }
     })
   })
 
@@ -348,20 +348,21 @@ roles
   .option('-j, --json', 'JSON 输出')
   .description('删除角色')
   .action(async (novelId: string, opts: any) => {
-    await withDb(db => {
-      const n = getNovelById(db, novelId)
+    await withDb(() => {
+      const n = getNovelById(novelId)
       if (!n) { console.error('Novel not found'); process.exit(1) }
       if (n.roleList.mainRole.roleName === opts.roleName) {
         console.error('Cannot delete main role'); process.exit(1)
       }
-      n.roleList.femaleRoles = n.roleList.femaleRoles.filter((r: any) => r.roleName !== opts.roleName)
-      n.roleList.supportingRoles = n.roleList.supportingRoles.filter((r: any) => r.roleName !== opts.roleName)
-      db.run(`UPDATE novels SET role_list = '${sqEscape(JSON.stringify(n.roleList))}', updated = '${nowISO()}' WHERE id = '${sqEscape(novelId)}'`)
-      if (opts.json) {
-        outputJSON({ deleted: opts.roleName })
-      } else {
-        console.log(`Role deleted: ${opts.roleName}`)
-      }
+
+      patchNovelJSON(novelId, 'role_list', (rl: any) => {
+        rl.femaleRoles = rl.femaleRoles.filter((r: any) => r.roleName !== opts.roleName)
+        rl.supportingRoles = rl.supportingRoles.filter((r: any) => r.roleName !== opts.roleName)
+        return rl
+      })
+
+      if (opts.json) { outputJSON({ deleted: opts.roleName }) }
+      else { console.log(`Role deleted: ${opts.roleName}`) }
     })
   })
 
@@ -374,14 +375,11 @@ outline
   .option('-j, --json', 'JSON 输出')
   .description('获取完整大纲')
   .action(async (novelId: string, opts: { json?: boolean }) => {
-    await withDb(db => {
-      const n = getNovelById(db, novelId)
+    await withDb(() => {
+      const n = getNovelById(novelId)
       if (!n) { console.error('Novel not found'); process.exit(1) }
-      if (opts.json) {
-        outputJSON(n.outline)
-      } else {
-        console.log(JSON.stringify(n.outline, null, 2))
-      }
+      if (opts.json) { outputJSON(n.outline) }
+      else { console.log(JSON.stringify(n.outline, null, 2)) }
     })
   })
 
@@ -392,18 +390,19 @@ outline
   .option('-j, --json', 'JSON 输出')
   .description('添加幕/卷')
   .action(async (novelId: string, opts: any) => {
-    await withDb(db => {
-      const n = getNovelById(db, novelId)
+    await withDb(() => {
+      const n = getNovelById(novelId)
       if (!n) { console.error('Novel not found'); process.exit(1) }
-      const ol = n.outline
-      const phase = { id: createId(), sort: ol.outlinePhases.length + 1, title: opts.title, description: '', chapterOutlines: [] }
-      ol.outlinePhases.push(phase)
-      db.run(`UPDATE novels SET outline = '${sqEscape(JSON.stringify(ol))}', updated = '${nowISO()}' WHERE id = '${sqEscape(novelId)}'`)
-      if (opts.json) {
-        outputJSON({ id: phase.id })
-      } else {
-        console.log(`Phase added: ${opts.title} (${phase.id})`)
-      }
+
+      let phaseId = ''
+      patchNovelJSON(novelId, 'outline', (ol: any) => {
+        phaseId = createId()
+        ol.outlinePhases.push({ id: phaseId, sort: ol.outlinePhases.length + 1, title: opts.title, description: '', chapterOutlines: [] })
+        return ol
+      })
+
+      if (opts.json) { outputJSON({ id: phaseId }) }
+      else { console.log(`Phase added: ${opts.title} (${phaseId})`) }
     })
   })
 
@@ -416,19 +415,20 @@ outline
   .option('-j, --json', 'JSON 输出')
   .description('更新幕/卷')
   .action(async (novelId: string, opts: any) => {
-    await withDb(db => {
-      const n = getNovelById(db, novelId)
+    await withDb(() => {
+      const n = getNovelById(novelId)
       if (!n) { console.error('Novel not found'); process.exit(1) }
-      const phase = n.outline.outlinePhases.find((p: any) => p.id === opts.phaseId)
-      if (!phase) { console.error('Phase not found'); process.exit(1) }
-      if (opts.title) { phase.title = opts.title }
-      if (opts.desc) { phase.description = opts.desc }
-      db.run(`UPDATE novels SET outline = '${sqEscape(JSON.stringify(n.outline))}', updated = '${nowISO()}' WHERE id = '${sqEscape(novelId)}'`)
-      if (opts.json) {
-        outputJSON({ updated: opts.phaseId })
-      } else {
-        console.log(`Phase updated: ${opts.phaseId}`)
-      }
+
+      patchNovelJSON(novelId, 'outline', (ol: any) => {
+        const phase = ol.outlinePhases.find((p: any) => p.id === opts.phaseId)
+        if (!phase) { throw new Error('Phase not found') }
+        if (opts.title) { phase.title = opts.title }
+        if (opts.desc) { phase.description = opts.desc }
+        return ol
+      })
+
+      if (opts.json) { outputJSON({ updated: opts.phaseId }) }
+      else { console.log(`Phase updated: ${opts.phaseId}`) }
     })
   })
 
@@ -439,17 +439,18 @@ outline
   .option('-j, --json', 'JSON 输出')
   .description('删除幕/卷')
   .action(async (novelId: string, opts: any) => {
-    await withDb(db => {
-      const n = getNovelById(db, novelId)
+    await withDb(() => {
+      const n = getNovelById(novelId)
       if (!n) { console.error('Novel not found'); process.exit(1) }
-      n.outline.outlinePhases = n.outline.outlinePhases.filter((p: any) => p.id !== opts.phaseId)
-      n.outline.outlinePhases.forEach((p: any, i: number) => { p.sort = i + 1 })
-      db.run(`UPDATE novels SET outline = '${sqEscape(JSON.stringify(n.outline))}', updated = '${nowISO()}' WHERE id = '${sqEscape(novelId)}'`)
-      if (opts.json) {
-        outputJSON({ deleted: opts.phaseId })
-      } else {
-        console.log(`Phase deleted: ${opts.phaseId}`)
-      }
+
+      patchNovelJSON(novelId, 'outline', (ol: any) => {
+        ol.outlinePhases = ol.outlinePhases.filter((p: any) => p.id !== opts.phaseId)
+        ol.outlinePhases.forEach((p: any, i: number) => { p.sort = i + 1 })
+        return ol
+      })
+
+      if (opts.json) { outputJSON({ deleted: opts.phaseId }) }
+      else { console.log(`Phase deleted: ${opts.phaseId}`) }
     })
   })
 
@@ -461,19 +462,21 @@ outline
   .option('-j, --json', 'JSON 输出')
   .description('添加章节大纲')
   .action(async (novelId: string, opts: any) => {
-    await withDb(db => {
-      const n = getNovelById(db, novelId)
+    await withDb(() => {
+      const n = getNovelById(novelId)
       if (!n) { console.error('Novel not found'); process.exit(1) }
-      const phase = n.outline.outlinePhases.find((p: any) => p.id === opts.phaseId)
-      if (!phase) { console.error('Phase not found'); process.exit(1) }
-      const ch = { id: createId(), sort: phase.chapterOutlines.length + 1, chapterTitle: opts.title || '', chapterDescription: '', hook: '' }
-      phase.chapterOutlines.push(ch)
-      db.run(`UPDATE novels SET outline = '${sqEscape(JSON.stringify(n.outline))}', updated = '${nowISO()}' WHERE id = '${sqEscape(novelId)}'`)
-      if (opts.json) {
-        outputJSON({ id: ch.id })
-      } else {
-        console.log(`Chapter outline added: ${opts.title || ch.id}`)
-      }
+
+      let chId = ''
+      patchNovelJSON(novelId, 'outline', (ol: any) => {
+        const phase = ol.outlinePhases.find((p: any) => p.id === opts.phaseId)
+        if (!phase) { throw new Error('Phase not found') }
+        chId = createId()
+        phase.chapterOutlines.push({ id: chId, sort: phase.chapterOutlines.length + 1, chapterTitle: opts.title || '', chapterDescription: '', hook: '' })
+        return ol
+      })
+
+      if (opts.json) { outputJSON({ id: chId }) }
+      else { console.log(`Chapter outline added: ${opts.title || chId}`) }
     })
   })
 
@@ -487,24 +490,25 @@ outline
   .option('-j, --json', 'JSON 输出')
   .description('更新章节大纲')
   .action(async (novelId: string, opts: any) => {
-    await withDb(db => {
-      const n = getNovelById(db, novelId)
+    await withDb(() => {
+      const n = getNovelById(novelId)
       if (!n) { console.error('Novel not found'); process.exit(1) }
-      let target: any = null
-      for (const p of n.outline.outlinePhases) {
-        target = p.chapterOutlines.find((c: any) => c.id === opts.chapterId)
-        if (target) { break }
-      }
-      if (!target) { console.error('Chapter outline not found'); process.exit(1) }
-      if (opts.title) { target.chapterTitle = opts.title }
-      if (opts.desc) { target.chapterDescription = opts.desc }
-      if (opts.hook) { target.hook = opts.hook }
-      db.run(`UPDATE novels SET outline = '${sqEscape(JSON.stringify(n.outline))}', updated = '${nowISO()}' WHERE id = '${sqEscape(novelId)}'`)
-      if (opts.json) {
-        outputJSON({ updated: opts.chapterId })
-      } else {
-        console.log(`Chapter outline updated: ${opts.chapterId}`)
-      }
+
+      patchNovelJSON(novelId, 'outline', (ol: any) => {
+        let target: any = null
+        for (const p of ol.outlinePhases) {
+          target = p.chapterOutlines.find((c: any) => c.id === opts.chapterId)
+          if (target) { break }
+        }
+        if (!target) { throw new Error('Chapter outline not found') }
+        if (opts.title) { target.chapterTitle = opts.title }
+        if (opts.desc) { target.chapterDescription = opts.desc }
+        if (opts.hook) { target.hook = opts.hook }
+        return ol
+      })
+
+      if (opts.json) { outputJSON({ updated: opts.chapterId }) }
+      else { console.log(`Chapter outline updated: ${opts.chapterId}`) }
     })
   })
 
@@ -515,19 +519,20 @@ outline
   .option('-j, --json', 'JSON 输出')
   .description('删除章节大纲')
   .action(async (novelId: string, opts: any) => {
-    await withDb(db => {
-      const n = getNovelById(db, novelId)
+    await withDb(() => {
+      const n = getNovelById(novelId)
       if (!n) { console.error('Novel not found'); process.exit(1) }
-      for (const p of n.outline.outlinePhases) {
-        p.chapterOutlines = p.chapterOutlines.filter((c: any) => c.id !== opts.chapterId)
-        p.chapterOutlines.forEach((c: any, i: number) => { c.sort = i + 1 })
-      }
-      db.run(`UPDATE novels SET outline = '${sqEscape(JSON.stringify(n.outline))}', updated = '${nowISO()}' WHERE id = '${sqEscape(novelId)}'`)
-      if (opts.json) {
-        outputJSON({ deleted: opts.chapterId })
-      } else {
-        console.log(`Chapter outline deleted: ${opts.chapterId}`)
-      }
+
+      patchNovelJSON(novelId, 'outline', (ol: any) => {
+        for (const p of ol.outlinePhases) {
+          p.chapterOutlines = p.chapterOutlines.filter((c: any) => c.id !== opts.chapterId)
+          p.chapterOutlines.forEach((c: any, i: number) => { c.sort = i + 1 })
+        }
+        return ol
+      })
+
+      if (opts.json) { outputJSON({ deleted: opts.chapterId }) }
+      else { console.log(`Chapter outline deleted: ${opts.chapterId}`) }
     })
   })
 
@@ -541,16 +546,13 @@ chapter
   .option('-j, --json', 'JSON 输出')
   .description('获取章节正文')
   .action(async (novelId: string, opts: any) => {
-    await withDb(db => {
-      const n = getNovelById(db, novelId)
+    await withDb(() => {
+      const n = getNovelById(novelId)
       if (!n) { console.error('Novel not found'); process.exit(1) }
       const ch = n.chapterList.chapters.find((c: any) => c.id === opts.chapterId)
       if (!ch) { console.error('Chapter not found'); process.exit(1) }
-      if (opts.json) {
-        outputJSON(ch)
-      } else {
-        console.log(JSON.stringify(ch, null, 2))
-      }
+      if (opts.json) { outputJSON(ch) }
+      else { console.log(JSON.stringify(ch, null, 2)) }
     })
   })
 
@@ -566,46 +568,46 @@ chapter
   .option('-j, --json', 'JSON 输出')
   .description('局部修改正文')
   .action(async (novelId: string, opts: any) => {
-    await withDb(db => {
-      const n = getNovelById(db, novelId)
+    await withDb(() => {
+      const n = getNovelById(novelId)
       if (!n) { console.error('Novel not found'); process.exit(1) }
-      const ch = n.chapterList.chapters.find((c: any) => c.id === opts.chapterId)
-      if (!ch) { console.error('Chapter not found'); process.exit(1) }
-      let newContent = ch.content
-      switch (opts.op) {
-        case 'replace':
-          if (!opts.target) { console.error('--target required'); process.exit(1) }
-          newContent = ch.content.replace(opts.target, opts.new ?? '')
-          break
-        case 'append':
-          newContent = ch.content + (opts.new ?? '')
-          break
-        case 'prepend':
-          newContent = (opts.new ?? '') + ch.content
-          break
-        case 'insert_after':
-          if (!opts.target) { console.error('--target required'); process.exit(1) }
-          newContent = ch.content.replace(opts.target, opts.target + (opts.new ?? ''))
-          break
-        case 'delete_range':
-          if (opts.start !== undefined && opts.end !== undefined) {
-            newContent = ch.content.slice(0, opts.start) + ch.content.slice(opts.end)
-          } else if (opts.target) {
-            newContent = ch.content.replace(opts.target, '')
-          } else {
-            console.error('--target or --start/--end required'); process.exit(1)
-          }
-          break
-        default:
-          console.error('Invalid op'); process.exit(1)
-      }
-      ch.content = newContent
-      db.run(`UPDATE novels SET chapter_list = '${sqEscape(JSON.stringify(n.chapterList))}', updated = '${nowISO()}' WHERE id = '${sqEscape(novelId)}'`)
-      if (opts.json) {
-        outputJSON({ updated: opts.chapterId, length: newContent.length })
-      } else {
-        console.log(`Chapter patched (${newContent.length} chars)`)
-      }
+
+      patchNovelJSON(novelId, 'chapter_list', (cl: any) => {
+        const ch = cl.chapters.find((c: any) => c.id === opts.chapterId)
+        if (!ch) { throw new Error('Chapter not found') }
+
+        switch (opts.op) {
+          case 'replace':
+            if (!opts.target) { throw new Error('--target required') }
+            ch.content = ch.content.replace(opts.target, opts.new ?? '')
+            break
+          case 'append':
+            ch.content = ch.content + (opts.new ?? '')
+            break
+          case 'prepend':
+            ch.content = (opts.new ?? '') + ch.content
+            break
+          case 'insert_after':
+            if (!opts.target) { throw new Error('--target required') }
+            ch.content = ch.content.replace(opts.target, opts.target + (opts.new ?? ''))
+            break
+          case 'delete_range':
+            if (opts.start !== undefined && opts.end !== undefined) {
+              ch.content = ch.content.slice(0, opts.start) + ch.content.slice(opts.end)
+            } else if (opts.target) {
+              ch.content = ch.content.replace(opts.target, '')
+            } else {
+              throw new Error('--target or --start/--end required')
+            }
+            break
+          default:
+            throw new Error('Invalid op')
+        }
+        return cl
+      })
+
+      if (opts.json) { outputJSON({ updated: opts.chapterId }) }
+      else { console.log(`Chapter patched`) }
     })
   })
 
@@ -617,18 +619,19 @@ chapter
   .option('-j, --json', 'JSON 输出')
   .description('全量替换正文')
   .action(async (novelId: string, opts: any) => {
-    await withDb(db => {
-      const n = getNovelById(db, novelId)
+    await withDb(() => {
+      const n = getNovelById(novelId)
       if (!n) { console.error('Novel not found'); process.exit(1) }
-      const ch = n.chapterList.chapters.find((c: any) => c.id === opts.chapterId)
-      if (!ch) { console.error('Chapter not found'); process.exit(1) }
-      ch.content = opts.content
-      db.run(`UPDATE novels SET chapter_list = '${sqEscape(JSON.stringify(n.chapterList))}', updated = '${nowISO()}' WHERE id = '${sqEscape(novelId)}'`)
-      if (opts.json) {
-        outputJSON({ replaced: opts.chapterId })
-      } else {
-        console.log(`Chapter ${opts.chapterId.slice(0, 8)}... replaced.`)
-      }
+
+      patchNovelJSON(novelId, 'chapter_list', (cl: any) => {
+        const ch = cl.chapters.find((c: any) => c.id === opts.chapterId)
+        if (!ch) { throw new Error('Chapter not found') }
+        ch.content = opts.content
+        return cl
+      })
+
+      if (opts.json) { outputJSON({ replaced: opts.chapterId }) }
+      else { console.log(`Chapter ${opts.chapterId.slice(0, 8)}... replaced.`) }
     })
   })
 
@@ -641,14 +644,11 @@ styleCmd
   .option('-j, --json', 'JSON 输出')
   .description('获取小说当前风格')
   .action(async (novelId: string, opts: { json?: boolean }) => {
-    await withDb(db => {
-      const n = getNovelById(db, novelId)
+    await withDb(() => {
+      const n = getNovelById(novelId)
       if (!n) { console.error('Novel not found'); process.exit(1) }
-      if (opts.json) {
-        outputJSON(n.writingStyle)
-      } else {
-        console.log(JSON.stringify(n.writingStyle, null, 2))
-      }
+      if (opts.json) { outputJSON(n.writingStyle) }
+      else { console.log(JSON.stringify(n.writingStyle, null, 2)) }
     })
   })
 
@@ -662,20 +662,20 @@ styleCmd
   .option('-j, --json', 'JSON 输出')
   .description('更新写作风格')
   .action(async (novelId: string, opts: any) => {
-    await withDb(db => {
-      const n = getNovelById(db, novelId)
+    await withDb(() => {
+      const n = getNovelById(novelId)
       if (!n) { console.error('Novel not found'); process.exit(1) }
-      const ws = n.writingStyle
-      if (opts.min !== undefined) { ws.charPerChapter.min = opts.min }
-      if (opts.max !== undefined) { ws.charPerChapter.max = opts.max }
-      if (opts.tone) { ws.baseTone = opts.tone }
-      if (opts.length) { ws.fullStoryLength = opts.length }
-      db.run(`UPDATE novels SET writing_style = '${sqEscape(JSON.stringify(ws))}', updated = '${nowISO()}' WHERE id = '${sqEscape(novelId)}'`)
-      if (opts.json) {
-        outputJSON({ updated: novelId })
-      } else {
-        console.log(`Writing style updated for ${novelId.slice(0, 8)}...`)
-      }
+
+      patchNovelJSON(novelId, 'writing_style', (ws: any) => {
+        if (opts.min !== undefined) { ws.charPerChapter.min = opts.min }
+        if (opts.max !== undefined) { ws.charPerChapter.max = opts.max }
+        if (opts.tone) { ws.baseTone = opts.tone }
+        if (opts.length) { ws.fullStoryLength = opts.length }
+        return ws
+      })
+
+      if (opts.json) { outputJSON({ updated: novelId }) }
+      else { console.log(`Writing style updated for ${novelId.slice(0, 8)}...`) }
     })
   })
 
@@ -687,19 +687,10 @@ preset
   .option('-j, --json', 'JSON 输出')
   .description('列出所有预设')
   .action(async (opts: { json?: boolean }) => {
-    await withDb(db => {
-      const rows = db.exec('SELECT * FROM writing_styles ORDER BY created DESC')
-      const items = (rows[0]?.values ?? []).map((v: any[]) => {
-        const cols = rows[0].columns
-        const row: Record<string, any> = {}
-        cols.forEach((c: string, i: number) => { row[c] = v[i] })
-        return row
-      })
-      if (opts.json) {
-        outputJSON(items)
-      } else {
-        console.log(JSON.stringify(items, null, 2))
-      }
+    await withDb(() => {
+      const items = queryAll('SELECT * FROM writing_styles ORDER BY created DESC')
+      if (opts.json) { outputJSON(items) }
+      else { console.log(JSON.stringify(items, null, 2)) }
     })
   })
 
@@ -713,16 +704,16 @@ preset
   .option('-j, --json', 'JSON 输出')
   .description('新建预设')
   .action(async (opts: any) => {
-    await withDb(db => {
+    await withDb(() => {
       const now = nowISO()
       const id = createId()
-      db.run(`INSERT INTO writing_styles (id, name, char_per_chapter_min, char_per_chapter_max, full_story_length, base_tone, created, updated)
-        VALUES ('${id}', '${sqEscape(opts.name)}', ${opts.min ?? 1000}, ${opts.max ?? 3000}, ${opts.length ?? 100000}, '${sqEscape(opts.tone || '')}', '${now}', '${now}')`)
-      if (opts.json) {
-        outputJSON({ id })
-      } else {
-        console.log(`Preset created: ${opts.name} (${id})`)
-      }
+      execute(
+        `INSERT INTO writing_styles (id, name, char_per_chapter_min, char_per_chapter_max, full_story_length, base_tone, created, updated)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [id, opts.name, opts.min ?? 1000, opts.max ?? 3000, opts.length ?? 100000, opts.tone || '', now, now],
+      )
+      if (opts.json) { outputJSON({ id }) }
+      else { console.log(`Preset created: ${opts.name} (${id})`) }
     })
   })
 
@@ -737,19 +728,23 @@ preset
   .option('-j, --json', 'JSON 输出')
   .description('更新预设')
   .action(async (opts: any) => {
-    await withDb(db => {
-      const sets: string[] = [`updated = '${nowISO()}'`]
-      if (opts.name) { sets.push(`name = '${sqEscape(opts.name)}'`) }
-      if (opts.min !== undefined) { sets.push(`char_per_chapter_min = ${opts.min}`) }
-      if (opts.max !== undefined) { sets.push(`char_per_chapter_max = ${opts.max}`) }
-      if (opts.length) { sets.push(`full_story_length = ${opts.length}`) }
-      if (opts.tone !== undefined) { sets.push(`base_tone = '${sqEscape(opts.tone)}'`) }
-      db.run(`UPDATE writing_styles SET ${sets.join(', ')} WHERE id = '${sqEscape(opts.id)}'`)
-      if (opts.json) {
-        outputJSON({ updated: opts.id })
-      } else {
-        console.log(`Preset ${opts.id.slice(0, 8)}... updated.`)
-      }
+    await withDb(() => {
+      // #65: 验证记录存在
+      const existing = queryFirst<{ id: string }>('SELECT id FROM writing_styles WHERE id = ?', [opts.id])
+      if (!existing) { console.error('Preset not found'); process.exit(1) }
+
+      const sets: string[] = ["updated = ?"]
+      const params: unknown[] = [nowISO()]
+      if (opts.name) { sets.push('name = ?'); params.push(opts.name) }
+      if (opts.min !== undefined) { sets.push('char_per_chapter_min = ?'); params.push(opts.min) }
+      if (opts.max !== undefined) { sets.push('char_per_chapter_max = ?'); params.push(opts.max) }
+      if (opts.length) { sets.push('full_story_length = ?'); params.push(opts.length) }
+      if (opts.tone !== undefined) { sets.push('base_tone = ?'); params.push(opts.tone) }
+      params.push(opts.id)
+
+      execute(`UPDATE writing_styles SET ${sets.join(', ')} WHERE id = ?`, params)
+      if (opts.json) { outputJSON({ updated: opts.id }) }
+      else { console.log(`Preset ${opts.id.slice(0, 8)}... updated.`) }
     })
   })
 
@@ -759,13 +754,13 @@ preset
   .option('-j, --json', 'JSON 输出')
   .description('删除预设')
   .action(async (opts: any) => {
-    await withDb(db => {
-      db.run(`DELETE FROM writing_styles WHERE id = '${sqEscape(opts.id)}'`)
-      if (opts.json) {
-        outputJSON({ deleted: opts.id })
-      } else {
-        console.log(`Preset ${opts.id.slice(0, 8)}... deleted.`)
-      }
+    await withDb(() => {
+      // #65: 验证记录存在
+      const existing = queryFirst<{ id: string }>('SELECT id FROM writing_styles WHERE id = ?', [opts.id])
+      if (!existing) { console.error('Preset not found'); process.exit(1) }
+      execute('DELETE FROM writing_styles WHERE id = ?', [opts.id])
+      if (opts.json) { outputJSON({ deleted: opts.id }) }
+      else { console.log(`Preset ${opts.id.slice(0, 8)}... deleted.`) }
     })
   })
 

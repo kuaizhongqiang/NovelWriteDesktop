@@ -33,10 +33,17 @@ function storeDbPath(p: string): void {
 export async function initDb(filePath?: string): Promise<SqlJsDatabase> {
   dbPath = filePath || getStoredDbPath() || process.env.NOVELWRITE_DB_PATH || './novelwrite.db'
 
-  // 如果传入了路径，保存到配置
-  if (filePath) storeDbPath(filePath)
+  // 如果传入了有效路径，保存到配置（跳过 :memory:）
+  if (filePath && filePath !== ':memory:') storeDbPath(filePath)
 
   const SQL = await initSqlJs()
+
+  // sql.js 原生支持 ':memory:' — 跳过文件系统操作
+  if (dbPath === ':memory:') {
+    db = new SQL.Database()
+    createAllTables(db)
+    return db
+  }
 
   const fullPath = path.resolve(dbPath)
   if (fs.existsSync(fullPath)) {
@@ -65,7 +72,7 @@ export function getDb(): SqlJsDatabase {
  * 将内存中的数据库写入磁盘
  */
 export function persistDb(): void {
-  if (!db || !dbPath) return
+  if (!db || !dbPath || dbPath === ':memory:') return
   const data = db.export()
   const fullPath = path.resolve(dbPath)
   const dir = path.dirname(fullPath)
