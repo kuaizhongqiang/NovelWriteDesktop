@@ -1,6 +1,13 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
+import { isLoggedIn } from '@/api'
 
 const routes: RouteRecordRaw[] = [
+  {
+    path: '/login',
+    name: 'login',
+    component: () => import('@/pages/LoginPage.vue'),
+    meta: { title: '登录', guest: true },
+  },
   {
     path: '/',
     name: 'dashboard',
@@ -54,12 +61,8 @@ const router = createRouter({
   routes,
 })
 
-// ============ 全局导航守卫：未保存更改提示 ============
+// ============ 全局导航守卫：未保存更改提示 + 登录检查 ============
 
-/**
- * 注册脏页面检查器。页面在数据变更时调用 setDirty(true)，
- * 保存完成后调用 setDirty(false)。路由离开时如有脏数据则弹窗确认。
- */
 let _isDirty = false
 
 export function setNavigationDirty(dirty: boolean) {
@@ -70,9 +73,18 @@ export function isNavigationDirty(): boolean {
   return _isDirty
 }
 
-router.beforeEach((_to, _from) => {
-  if (_isDirty) {
-    // 使用 window.confirm 作为简单提示（后续可升级为 Naive UI 对话框）
+router.beforeEach((to, _from) => {
+  // 未登录且不是 guest 页面 → 跳转登录
+  if (!isLoggedIn() && to.name !== 'login') {
+    return { name: 'login' }
+  }
+  // 已登录且访问登录页 → 跳转首页
+  if (isLoggedIn() && to.name === 'login') {
+    return { name: 'dashboard' }
+  }
+
+  // 未保存更改提示
+  if (_isDirty && to.name !== 'login') {
     const ok = window.confirm('有未保存的更改，确定离开吗？')
     if (!ok) return false
     _isDirty = false
