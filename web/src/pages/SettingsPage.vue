@@ -10,6 +10,7 @@ const router = useRouter()
 const message = useMessage()
 
 // 本地编辑副本
+const localTitle = ref('')
 const form = ref<NovelBaseData>({
   description: '',
   oneWord: '',
@@ -50,6 +51,7 @@ watch(
   novel,
   (n) => {
     if (n) {
+      localTitle.value = n.title
       form.value = { ...n.novelBaseData }
       selectedPresetId.value = n.writingStyle?.id ?? ''
     }
@@ -80,6 +82,7 @@ function handlePresetChange(presetId: string) {
 async function handleSave() {
   if (novel.value) {
     store.updateNovel(novelId.value, {
+      title: localTitle.value,
       novelBaseData: { ...form.value },
     })
     message.success('已保存')
@@ -96,13 +99,12 @@ function handleCancel() {
     <n-h2>小说基础设定</n-h2>
 
     <n-form
-      :model="novel"
       :rules="rules"
       label-placement="top"
       style="margin-top: 16px;"
     >
       <n-form-item label="标题" path="title">
-        <n-input v-model:value="novel.title" placeholder="输入小说标题" />
+        <n-input v-model:value="localTitle" placeholder="输入小说标题" />
       </n-form-item>
 
       <n-form-item label="题材" path="genre">

@@ -21,13 +21,27 @@ function getNovelJSON(novelId: string, field: string): Record<string, unknown> {
 
 function patchNovelJSON(novelId: string, field: string, mutator: (data: any) => any): void {
   const db = getDb()
-  const row = queryFirst<{ [key: string]: string }>(`SELECT ${field} FROM novels WHERE id = ?`, [novelId])
-  if (!row) throw new Error('Novel not found')
-  const current = JSON.parse(row[field] || '{}')
-  const updated = mutator(current)
-  execute(`UPDATE novels SET ${field} = ?, updated = ? WHERE id = ?`, [
-    JSON.stringify(updated), nowISO(), novelId,
-  ], { tx: true })
+  db.run('BEGIN')
+  try {
+    const stmt = db.prepare(`SELECT ${field} FROM novels WHERE id = ?`)
+    stmt.bind([novelId])
+    if (!stmt.step()) {
+      stmt.free()
+      db.run('ROLLBACK')
+      throw new Error('Novel not found')
+    }
+    const row = stmt.getAsObject() as Record<string, string>
+    stmt.free()
+    const current = JSON.parse(row[field] || '{}')
+    const updated = mutator(current)
+    db.run(`UPDATE novels SET ${field} = ?, updated = ? WHERE id = ?`, [
+      JSON.stringify(updated), nowISO(), novelId,
+    ])
+    db.run('COMMIT')
+  } catch (err) {
+    db.run('ROLLBACK')
+    throw err
+  }
 }
 
 // ============ 工具注册表 ============

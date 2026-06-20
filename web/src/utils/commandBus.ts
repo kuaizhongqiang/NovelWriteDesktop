@@ -28,7 +28,10 @@ export interface Command<T = unknown> {
 
 // ============ 权限检查 ============
 
-let _confirmFn: (description: string, permission: 'write' | 'delete') => Promise<boolean> = async () => true
+let _confirmFn: (description: string, permission: 'write' | 'delete') => Promise<boolean> = async (desc, perm) => {
+  console.warn(`[CommandBus] 权限确认未注入，自动放行 ${perm}: ${desc}`)
+  return true
+}
 
 /**
  * 设置确认回调（由组件在 setup 中注入）

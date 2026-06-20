@@ -13,6 +13,7 @@ const sessions = new Map<string, Session>()
 
 const SESSION_TTL_MS = 24 * 60 * 60 * 1000 // 24h
 const CLEANUP_INTERVAL_MS = 10 * 60 * 1000  // 每 10min 清理过期
+const MAX_MESSAGES_PER_SESSION = 200      // 单会话消息上限（防止内存泄漏）
 
 // 启动定期清理
 let cleanupTimer: ReturnType<typeof setInterval> | null = null
@@ -72,7 +73,7 @@ export function deleteSession(id: string): void {
   sessions.delete(id)
 }
 
-export function setSessionAbortController(id: string, controller: AbortController): void {
+export function setSessionAbortController(id: string, controller: AbortController | null): void {
   const session = sessions.get(id)
   if (session) {
     session.abortController = controller
@@ -83,6 +84,14 @@ export function addMessage(id: string, message: ChatMessage): void {
   const session = sessions.get(id)
   if (session) {
     session.messages.push(message)
+    // 防内存泄漏：超限时移除最早的 system 之外的消息
+    if (session.messages.length > MAX_MESSAGES_PER_SESSION) {
+      const toRemove = session.messages.length - MAX_MESSAGES_PER_SESSION
+      // 保留第一条（通常是 system prompt），移除后续多余消息
+      const keepSystem = session.messages[0].role === 'system'
+      const removeStart = keepSystem ? 1 : 0
+      session.messages.splice(removeStart, toRemove)
+    }
     session.lastActivityAt = Date.now()
   }
 }

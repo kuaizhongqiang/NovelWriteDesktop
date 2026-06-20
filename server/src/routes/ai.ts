@@ -6,7 +6,7 @@
  * GET    /api/ai/session/:id/stats — 会话统计
  */
 import { Router, type Request, type Response } from 'express'
-import { createSession, getSession, deleteSession, addMessage, updateStats, getSessionStats, createSystemPrompt } from '../ai/session.js'
+import { createSession, getSession, deleteSession, addMessage, updateStats, getSessionStats, createSystemPrompt, setSessionAbortController } from '../ai/session.js'
 import { chat } from '../ai/deepseek.js'
 import { executeToolCall } from '../ai/tools.js'
 import type { ChatMessage, ToolCall } from '../ai/types.js'
@@ -62,15 +62,13 @@ router.post('/chat', (req: Request, res: Response) => {
 
   // AbortController 用于取消
   const abortController = new AbortController()
-  const { init } = require('../db/index.js')
-  const sessionModule = require('../ai/session.js')
-  sessionModule.setSessionAbortController(session.id, abortController)
+  setSessionAbortController(session.id, abortController)
 
   // 客户端断开时取消
   req.on('close', () => {
     abortController.abort()
     if (session) {
-      sessionModule.setSessionAbortController(session.id, null)
+      setSessionAbortController(session.id, null)
       session.status = 'idle'
     }
   })
