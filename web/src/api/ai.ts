@@ -2,10 +2,9 @@
  * AI Agent 前端 API 客户端
  *
  * 管理 SSE 连接、会话状态、流式渲染。
+ * 认证由 Cookie Session 自动管理。
  */
-import { getStoredToken } from './index'
-
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3002/api'
+import { API_BASE } from './index'
 
 // ============ 类型 ============
 
@@ -61,19 +60,16 @@ export class AIClient {
 
     this.abortController = new AbortController()
 
-    const token = getStoredToken()
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-    if (token) headers['Authorization'] = `Bearer ${token}`
-
     try {
       const response = await fetch(`${API_BASE}/ai/chat`, {
         method: 'POST',
-        headers,
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message,
           sessionId: this.sessionId,
           context,
         }),
+        credentials: 'include',
         signal: this.abortController.signal,
       })
 
@@ -107,12 +103,9 @@ export class AIClient {
     if (!this.sessionId) return
     this.cancel()
     try {
-      const token = getStoredToken()
-      const headers: Record<string, string> = {}
-      if (token) headers['Authorization'] = `Bearer ${token}`
       await fetch(`${API_BASE}/ai/session/${this.sessionId}`, {
         method: 'DELETE',
-        headers,
+        credentials: 'include',
       })
     } catch { /* ignore */ }
     this.sessionId = null
@@ -122,10 +115,7 @@ export class AIClient {
   async getStats(): Promise<SessionStats | null> {
     if (!this.sessionId) return null
     try {
-      const token = getStoredToken()
-      const headers: Record<string, string> = {}
-      if (token) headers['Authorization'] = `Bearer ${token}`
-      const res = await fetch(`${API_BASE}/ai/session/${this.sessionId}/stats`, { headers })
+      const res = await fetch(`${API_BASE}/ai/session/${this.sessionId}/stats`, { credentials: 'include' })
       if (!res.ok) return null
       return res.json()
     } catch {
@@ -162,4 +152,3 @@ export class AIClient {
     }
   }
 }
-

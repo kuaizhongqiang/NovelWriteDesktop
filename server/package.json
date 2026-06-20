@@ -1,6 +1,6 @@
 {
   "name": "novelwrite-server",
-  "version": "0.3.3-beta",
+  "version": "0.4.0-beta",
   "type": "module",
   "bin": {
     "novelwrite": "./bin/novelwrite.js",
@@ -27,6 +27,7 @@
   },
   "dependencies": {
     "commander": "^12.1.0",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
@@ -34,6 +35,7 @@
     "sql.js": "^1.11.0"
   },
   "devDependencies": {
+    "@types/cookie-parser": "^1.4.10",
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.1",
     "@types/express-rate-limit": "^5.1.3",

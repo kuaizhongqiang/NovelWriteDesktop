@@ -1,6 +1,7 @@
 import express from 'express'
 import cors from 'cors'
 import rateLimit from 'express-rate-limit'
+import cookieParser from 'cookie-parser'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import dotenv from 'dotenv'
@@ -10,6 +11,8 @@ import authRouter from './routes/auth.js'
 import novelRoutes from './routes/novels.js'
 import writingStyleRoutes from './routes/writingStyles.js'
 import aiRoutes from './routes/ai.js'
+import { ensurePasswordInitialized } from './db/password.js'
+import { setCookieSecret, getCookieSecret } from './db/session.js'
 
 dotenv.config()
 
@@ -22,6 +25,18 @@ const webDist = path.resolve(__dirname, '../static')
 
 async function main() {
   await initDb()
+
+  // 首次启动自动生成密码
+  const initialPassword = ensurePasswordInitialized()
+  if (initialPassword) {
+    console.log('')
+    console.log('  ╔══════════════════════════════════════════╗')
+    console.log('  ║  NovelWrite 首次启动                     ║')
+    console.log(`  ║  初始密码: ${initialPassword.padEnd(22)}║`)
+    console.log('  ║  请复制保存，登录后建议修改密码           ║')
+    console.log('  ╚══════════════════════════════════════════╝')
+    console.log('')
+  }
 
   const app = express()
 
@@ -67,6 +82,7 @@ async function main() {
 
   app.use(cors({ origin: CORS_ORIGIN, credentials: true }))
   app.use(express.json({ limit: '10mb' }))
+  app.use(cookieParser(getCookieSecret()))
   app.use(generalLimiter)
 
   // 静态文件（在 auth 之前，公开访问）

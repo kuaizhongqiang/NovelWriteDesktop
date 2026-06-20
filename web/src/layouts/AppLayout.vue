@@ -2,9 +2,11 @@
 import { useRoute, useRouter } from 'vue-router'
 import { useTheme } from '@/composables/useTheme'
 import AgentBar from '@/components/AgentBar.vue'
+import { authApi } from '@/api'
 
 const route = useRoute()
 const router = useRouter()
+const message = useMessage()
 const { isDark, toggleTheme } = useTheme()
 
 const agentCollapsed = ref(false)
@@ -25,6 +27,12 @@ const navItems = computed(() => {
     { name: 'style', label: '写作风格', to: `${base}/style`, enabled: !!id },
   ]
 })
+
+async function handleLogout() {
+  await authApi.logout()
+  message.success('已退出')
+  router.push('/login')
+}
 
 function handleNavClick(item: { to: string; enabled: boolean }) {
   if (item.enabled && item.to) {
@@ -61,9 +69,12 @@ function handleNavClick(item: { to: string; enabled: boolean }) {
           {{ item.label }}
         </n-button>
       </n-space>
-      <div style="margin-left: auto;">
+      <div style="margin-left: auto; display: flex; align-items: center; gap: 8px;">
         <n-button text size="small" @click="toggleTheme" style="font-size: 18px;">
           {{ isDark ? '☀️' : '🌙' }}
+        </n-button>
+        <n-button text size="tiny" type="error" @click="handleLogout">
+          退出
         </n-button>
       </div>
     </n-layout-header>

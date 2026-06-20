@@ -11,14 +11,14 @@ import {
   createDefaultWritingStyle,
   createId,
 } from '@/types'
-import { novelsApi, writingStylesApi, isLoggedIn } from '@/api'
+import { novelsApi, writingStylesApi } from '@/api'
 import { getAdapter } from '@/api/storage'
 
 export const useAllDataStore = defineStore('allData', () => {
   // ============ State ============
   const data = ref<AllData>({ version: 1, novels: [], writingStyles: [] })
   const loaded = ref(false)
-  const syncEnabled = ref(isLoggedIn())
+  const syncEnabled = ref(true)
 
   // ============ 初始化（异步加载） ============
   async function init(): Promise<void> {

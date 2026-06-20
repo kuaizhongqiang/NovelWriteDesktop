@@ -1,35 +1,32 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
-import { setStoredToken, isLoggedIn, authApi } from '@/api'
+import { authApi, checkAuthStatus } from '@/api'
 
 const router = useRouter()
 const message = useMessage()
 
-const apiKey = ref('')
+const password = ref('')
 const loading = ref(false)
 
-// 如果已有 Key，自动跳转
-onMounted(() => {
-  if (isLoggedIn()) {
-    router.push('/')
-  }
+onMounted(async () => {
+  const loggedIn = await checkAuthStatus()
+  if (loggedIn) router.push('/')
 })
 
 async function handleLogin() {
-  const key = apiKey.value.trim()
-  if (!key) {
-    message.warning('请输入 API Key')
+  const pwd = password.value.trim()
+  if (!pwd) {
+    message.warning('请输入密码')
     return
   }
 
   loading.value = true
   try {
-    const res = await authApi.login(key)
-    setStoredToken(key)
-    message.success(`欢迎回来，${res.name}！`)
+    await authApi.login(pwd)
+    message.success('登录成功')
     router.push('/')
-  } catch (err) {
-    message.error('API Key 无效，请检查后重试')
+  } catch {
+    message.error('密码错误')
   } finally {
     loading.value = false
   }
@@ -46,16 +43,16 @@ function handleKeydown(e: KeyboardEvent) {
       <div style="text-align: center; margin-bottom: 24px;">
         <div style="font-size: 48px; margin-bottom: 8px;">📖</div>
         <div style="font-size: 20px; font-weight: 700;">NovelWrite</div>
-        <div style="font-size: 13px; color: var(--nw-text-muted); margin-top: 4px;">输入 API Key 开始写作</div>
+        <div style="font-size: 13px; color: var(--nw-text-muted); margin-top: 4px;">输入密码开始写作</div>
       </div>
 
       <n-form label-placement="top" @submit.prevent="handleLogin">
-        <n-form-item label="API Key">
+        <n-form-item label="密码">
           <n-input
-            v-model:value="apiKey"
+            v-model:value="password"
             type="password"
             show-password-on="click"
-            placeholder="请输入 nw_ 开头的 API Key"
+            placeholder="请输入管理员密码"
             :disabled="loading"
             @keydown="handleKeydown"
           />
@@ -73,10 +70,7 @@ function handleKeydown(e: KeyboardEvent) {
       </n-form>
 
       <div style="margin-top: 16px; font-size: 12px; color: var(--nw-text-light); text-align: center;">
-        <p>首次使用？在服务端运行以下命令生成 Key：</p>
-        <n-code style="display: block; margin-top: 4px; font-size: 11px;">
-          novelwrite auth generate my-key
-        </n-code>
+        <p>首次运行服务端时会在控制台输出初始密码</p>
       </div>
     </n-card>
   </div>

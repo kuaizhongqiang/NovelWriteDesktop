@@ -39,4 +39,13 @@ export function createAllTables(db: SqlJsDatabase): void {
       revoked     INTEGER NOT NULL DEFAULT 0
     )
   `)
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS admin_password (
+      id            INTEGER PRIMARY KEY DEFAULT 1,
+      password_hash TEXT NOT NULL,
+      created       TEXT NOT NULL,
+      updated       TEXT NOT NULL
+    )
+  `)
 }

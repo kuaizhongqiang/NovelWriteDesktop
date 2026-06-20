@@ -1,5 +1,4 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
-import { isLoggedIn } from '@/api'
 
 const routes: RouteRecordRaw[] = [
   {
@@ -61,7 +60,7 @@ const router = createRouter({
   routes,
 })
 
-// ============ 全局导航守卫：未保存更改提示 + 登录检查 ============
+// ============ 全局导航守卫：登录检查 + 未保存提示 ============
 
 let _isDirty = false
 
@@ -73,18 +72,21 @@ export function isNavigationDirty(): boolean {
   return _isDirty
 }
 
-router.beforeEach((to, _from) => {
-  // 未登录且不是 guest 页面 → 跳转登录
-  if (!isLoggedIn() && to.name !== 'login') {
+router.beforeEach(async (to, _from) => {
+  // 登录页直接放行
+  if (to.name === 'login') return true
+
+  // 检查登录状态
+  try {
+    const { checkAuthStatus } = await import('@/api')
+    const loggedIn = await checkAuthStatus()
+    if (!loggedIn) return { name: 'login' }
+  } catch {
     return { name: 'login' }
-  }
-  // 已登录且访问登录页 → 跳转首页
-  if (isLoggedIn() && to.name === 'login') {
-    return { name: 'dashboard' }
   }
 
   // 未保存更改提示
-  if (_isDirty && to.name !== 'login') {
+  if (_isDirty) {
     const ok = window.confirm('有未保存的更改，确定离开吗？')
     if (!ok) return false
     _isDirty = false
