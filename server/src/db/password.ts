@@ -4,7 +4,7 @@
  * 首次启动自动生成随机密码，console 醒目输出。
  */
 import crypto from 'crypto'
-import { getDb } from './index.js'
+import { getDb, persistDb } from './index.js'
 
 const SALT_LENGTH = 16
 const KEY_LENGTH = 64
@@ -48,13 +48,17 @@ export function savePasswordHash(hash: string): void {
   } else {
     db.run('INSERT INTO admin_password (id, password_hash, created, updated) VALUES (1, ?, ?, ?)', [hash, now, now])
   }
+  persistDb()
 }
 
-export function changePassword(oldPassword: string, newPassword: string): boolean {
+export async function changePassword(oldPassword: string, newPassword: string): Promise<boolean> {
   const stored = getStoredHash()
   if (!stored) return false
   if (!verifyPassword(oldPassword, stored)) return false
   savePasswordHash(hashPassword(newPassword))
+  // #76: 修改密码后清空所有 session，强制重新登录
+  const { clearAllSessions } = await import('./session.js')
+  clearAllSessions()
   return true
 }
 
@@ -73,5 +77,6 @@ export function ensurePasswordInitialized(): string | null {
   const password = generateRandomPassword()
   const hash = hashPassword(password)
   savePasswordHash(hash)
+  persistDb() // 立即落盘，防止重启丢失
   return password
 }

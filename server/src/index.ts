@@ -12,7 +12,7 @@ import novelRoutes from './routes/novels.js'
 import writingStyleRoutes from './routes/writingStyles.js'
 import aiRoutes from './routes/ai.js'
 import { ensurePasswordInitialized } from './db/password.js'
-import { setCookieSecret, getCookieSecret } from './db/session.js'
+import { getCookieSecret } from './db/session.js'
 
 dotenv.config()
 

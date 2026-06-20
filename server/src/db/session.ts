@@ -16,7 +16,20 @@ const CLEANUP_INTERVAL_MS = 10 * 60 * 1000
 const SESSION_COOKIE = 'nw_session'
 
 let cleanupTimer: ReturnType<typeof setInterval> | null = null
-let cookieSecret = process.env.SESSION_SECRET || 'novelwrite-default-secret'
+
+// Lazy init: 调用时再读 env，确保 dotenv.config() 已执行
+let _cookieSecret: string | null = null
+
+function getSecret(): string {
+  if (!_cookieSecret) {
+    _cookieSecret = process.env.SESSION_SECRET || 'novelwrite-default-secret'
+  }
+  return _cookieSecret
+}
+
+export function resetCookieSecret(): void {
+  _cookieSecret = null
+}
 
 function startCleanup() {
   if (cleanupTimer) return
@@ -28,12 +41,8 @@ function startCleanup() {
   }, CLEANUP_INTERVAL_MS)
 }
 
-export function setCookieSecret(secret: string) {
-  cookieSecret = secret
-}
-
 export function getCookieSecret(): string {
-  return cookieSecret
+  return getSecret()
 }
 
 export function getCookieName(): string {
@@ -60,4 +69,9 @@ export function validateSession(id: string): boolean {
 
 export function deleteSession(id: string): void {
   sessions.delete(id)
+}
+
+/** 清空所有 session（修改密码时调用） */
+export function clearAllSessions(): void {
+  sessions.clear()
 }

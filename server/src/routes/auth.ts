@@ -96,7 +96,7 @@ router.get('/status', (req: Request, res: Response) => {
 
 // ============ POST /api/auth/change-password ============
 
-router.post('/change-password', (req: Request, res: Response) => {
+router.post('/change-password', async (req: Request, res: Response) => {
   const { oldPassword, newPassword } = req.body
   if (!oldPassword || !newPassword) {
     res.status(400).json({ error: 'oldPassword and newPassword are required' })
@@ -107,7 +107,7 @@ router.post('/change-password', (req: Request, res: Response) => {
     return
   }
 
-  const ok = changePassword(oldPassword, newPassword)
+  const ok = await changePassword(oldPassword, newPassword)
   if (!ok) {
     res.status(401).json({ error: 'Invalid old password' })
     return
