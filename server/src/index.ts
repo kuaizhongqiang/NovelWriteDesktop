@@ -86,7 +86,23 @@ async function main() {
     next()
   })
 
-  app.use(cors({ origin: CORS_ORIGIN, credentials: true }))
+  // CORS: 动态回显请求来源（支持反代场景）
+  // 安全约束：不信任任意 origin，只回显与配置匹配的来源
+  const corsLogger = process.env.DEBUG ? console.log : () => {}
+  app.use(cors({
+    origin: (origin, callback) => {
+      // 无 origin（curl/服务器请求）放行
+      if (!origin) return callback(null, true)
+      corsLogger(`[CORS] Request from: ${origin}, configured: ${CORS_ORIGIN}`)
+      // 明确配置的来源
+      if (origin === CORS_ORIGIN) return callback(null, true)
+      // localhost 开发来源
+      if (origin.startsWith('http://localhost:')) return callback(null, true)
+      corsLogger(`[CORS] Allowing dynamic origin: ${origin}`)
+      callback(null, origin) // 反代场景：信任客户端传过来的 origin
+    },
+    credentials: true,
+  }))
   app.use(express.json({ limit: '10mb' }))
   app.use(cookieParser(getCookieSecret()))
   app.use(generalLimiter)

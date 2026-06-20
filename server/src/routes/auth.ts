@@ -53,16 +53,22 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
 
 router.post('/login', (req: Request, res: Response) => {
   const { password } = req.body
+  console.log(`[Auth] Login attempt from origin: ${req.headers.origin || 'unknown'}`)
   if (!password || typeof password !== 'string') {
+    console.log('[Auth] Missing password in request body')
     res.status(400).json({ error: 'Password is required' })
     return
   }
 
   const stored = getStoredHash()
+  console.log(`[Auth] Password hash ${stored ? 'found' : 'NOT FOUND'} in DB`)
   if (!stored || !verifyPassword(password, stored)) {
+    console.log('[Auth] Password verification FAILED')
+    console.log(`[Auth] Request headers:`, JSON.stringify(req.headers))
     res.status(401).json({ error: 'Invalid password' })
     return
   }
+  console.log('[Auth] Password verification OK')
 
   const sessionId = createSession()
   res.cookie(getCookieName(), sessionId, {
