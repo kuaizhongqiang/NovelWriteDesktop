@@ -3,11 +3,12 @@
  *
  * 认证由 Cookie Session 自动管理，前端不存储 Token。
  * 401 时跳转登录页。
+ * API_BASE 默认从当前页面 origin 推导（支持反代场景）。
  */
 import type { Novel, WritingStyle } from '@/types'
 import router from '@/router'
 
-export const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3002/api'
+export const API_BASE = import.meta.env.VITE_API_BASE || `${window.location.origin}/api`
 
 // ============ HTTP 客户端 ============
 
