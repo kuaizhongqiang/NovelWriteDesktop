@@ -59,7 +59,10 @@ async function main() {
     // CSP: 限制资源加载来源，防止 XSS
     // connect-src 必须包含前端实际域名（从 CORS_ORIGIN 取），不能写死
     const frontendOrigin = CORS_ORIGIN.replace(/\/$/, '')
-    const connectSrc = `connect-src 'self' ${frontendOrigin}`
+    // API 自身地址（前端不通过反代时直连用）
+    const apiOrigin = `http://localhost:${PORT}`
+    const origins = [...new Set(['self', frontendOrigin, apiOrigin])]
+    const connectSrc = `connect-src ${origins.join(' ')}`
     res.setHeader(
       'Content-Security-Policy',
       [
