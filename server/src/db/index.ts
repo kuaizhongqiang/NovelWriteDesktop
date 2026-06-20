@@ -31,7 +31,8 @@ function storeDbPath(p: string): void {
  * 首次调用时创建表结构
  */
 export async function initDb(filePath?: string): Promise<SqlJsDatabase> {
-  dbPath = filePath || getStoredDbPath() || process.env.NOVELWRITE_DB_PATH || './novelwrite.db'
+  const stored = getStoredDbPath()
+  dbPath = filePath || (stored && stored !== ':memory:' ? stored : null) || process.env.NOVELWRITE_DB_PATH || './novelwrite.db'
 
   // 如果传入了有效路径，保存到配置（跳过 :memory:）
   if (filePath && filePath !== ':memory:') storeDbPath(filePath)

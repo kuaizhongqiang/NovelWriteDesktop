@@ -88,6 +88,18 @@ cp novelwrite.db novelwrite.db.bak
 cat server.log
 ```
 
+## 更新前端
+
+```bash
+# 从源码构建前端
+cd web
+npm install
+npm run build
+
+# 复制到服务端静态目录
+mkdir -p ../server/static && cp -r dist/* ../server/static/
+```
+
 ## 开发
 
 ```bash
@@ -96,4 +108,9 @@ cd server
 npm install
 cp .env.example .env    # 编辑填入 DEEPSEEK_API_KEY
 npm run dev             # tsx watch 热重载
+
+# 前端开发（另一个终端）
+cd web
+npm run dev             # http://localhost:5173
+# 开发时设置 CORS_ORIGIN=http://localhost:5173
 ```
