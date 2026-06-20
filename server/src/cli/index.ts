@@ -3,9 +3,11 @@ import { Command } from 'commander'
 import crypto from 'crypto'
 import fs from 'fs'
 import path from 'path'
-import { initDb, getDb, closeDb } from '../db/index.js'
+import { initDb, getDb, closeDb, persistDb } from '../db/index.js'
 import { queryFirst, queryAll, execute } from '../db/query.js'
 import { createId, nowISO } from '../types/index.js'
+import { getStoredHash, savePasswordHash, hashPassword, generateRandomPassword } from '../db/password.js'
+import { clearAllSessions } from '../db/session.js'
 
 // ============ 工具函数 ============
 const API_KEY_PREFIX = 'nw_'
@@ -151,6 +153,42 @@ auth
         outputJSON({ revoked: id })
       } else {
         console.log(`API Key ${id.slice(0, 8)}... revoked.`)
+      }
+    })
+  })
+
+auth
+  .command('password')
+  .option('--reset', '重置密码')
+  .option('-j, --json', 'JSON 输出')
+  .description('查看或重置登录密码')
+  .action(async (opts: { reset?: boolean; json?: boolean }) => {
+    await withDb(() => {
+      if (opts.reset) {
+        const newPassword = generateRandomPassword()
+        const hash = hashPassword(newPassword)
+        savePasswordHash(hash)
+        clearAllSessions()
+        if (opts.json) {
+          outputJSON({ password: newPassword })
+        } else {
+          console.log(`\n  新密码: ${newPassword}\n`)
+        }
+      } else {
+        const hash = getStoredHash()
+        if (hash) {
+          if (opts.json) {
+            outputJSON({ passwordSet: true })
+          } else {
+            console.log('✅ 密码已设置')
+          }
+        } else {
+          if (opts.json) {
+            outputJSON({ passwordSet: false })
+          } else {
+            console.log('❌ 密码未设置，启动服务端时自动生成')
+          }
+        }
       }
     })
   })

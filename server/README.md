@@ -6,7 +6,7 @@
 
 ```bash
 # 安装
-npm install -g novelwrite-server@alpha
+npm install -g novelwrite-server@beta
 
 # 初始化数据库
 novelwrite init
@@ -35,6 +35,8 @@ novelwrite-server
 
 ```bash
 novelwrite init                          # 初始化数据库
+novelwrite auth password                 # 查看密码状态
+novelwrite auth password --reset         # 重置密码
 novelwrite auth generate <name>          # 生成 API Key（程序调用用）
 novelwrite auth list                     # 列出所有 Key
 novelwrite auth revoke <id>              # 吊销 Key

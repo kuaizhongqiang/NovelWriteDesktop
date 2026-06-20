@@ -9,27 +9,23 @@
 
 ```bash
 # 1. 安装服务端
-npm install -g novelwrite-server@alpha
+npm install -g novelwrite-server@beta
 
 # 2. 初始化数据库
 novelwrite init
 
-# 3. 生成 API Key（用于前端登录）
-novelwrite auth generate my-key
-# 输出: API Key generated:
-#   Name: my-key
-#   Key:  nw_xxxx...    ← 保存此 Key，登录前端时需要
-
-# 4. 配置环境变量
-#    在运行目录创建 .env 文件：
-cat > .env << EOF
-DEEPSEEK_API_KEY=sk-your-deepseek-api-key
-PORT=3002
-EOF
-
-# 5. 启动服务
+# 3. 启动服务
 novelwrite-server
-# 访问 http://localhost:3002
+# 首次启动会在控制台输出初始密码：
+#
+#   ╔══════════════════════════════════════════╗
+#   ║  NovelWrite 首次启动                     ║
+#   ║  初始密码: ab3f-9k2m-w1xp               ║
+#   ║  请复制保存，登录后建议修改密码           ║
+#   ╚══════════════════════════════════════════╝
+#
+# 4. 浏览器访问 http://localhost:3002
+#    输入初始密码登录
 ```
 
 ### 环境变量说明
@@ -38,14 +34,15 @@ novelwrite-server
 |------|------|--------|------|
 | `DEEPSEEK_API_KEY` | ✅ AI 功能必需 | — | DeepSeek API Key，用于 AI 写作助手 |
 | `PORT` | 否 | `3002` | 服务端口 |
-| `CORS_ORIGIN` | 否 | `http://localhost:5173` | CORS 允许的前端地址（开发用） |
 | `NOVELWRITE_DB_PATH` | 否 | `./novelwrite.db` | SQLite 数据库路径 |
 | `DEEPSEEK_ENDPOINT` | 否 | `https://api.deepseek.com/v1/chat/completions` | DeepSeek API 端点 |
 | `DEEPSEEK_MODEL` | 否 | `deepseek-v4-flash` | 模型名称 |
+| `DEBUG` | 否 | — | 设为 `1` 启用 CORS/请求调试日志 |
 
 ### 前端登录
 
-启动服务后，浏览器访问 `http://localhost:3002`，在登录页输入步骤 3 生成的 API Key 即可。
+启动服务后，浏览器访问 `http://localhost:3002`，输入控制台输出的初始密码即可登录。
+首次登录后建议修改密码：`novelwrite auth password --reset`。
 
 ## 本地开发
 
@@ -65,16 +62,18 @@ npm run dev           # http://localhost:3002
 ## CLI 命令
 
 ```bash
-novelwrite --help          # 查看所有命令
-novelwrite init            # 初始化数据库
-novelwrite auth generate <name>   # 生成 API Key
-novelwrite auth list       # 列出所有 Key
-novelwrite auth revoke <id>       # 吊销 Key
-novelwrite novel list      # 小说列表
-novelwrite novel get <id>  # 查看小说
-novelwrite novel create <title>   # 新建小说
-novelwrite roles list <novelId>   # 角色列表
-novelwrite outline get <novelId>  # 查看大纲
+novelwrite --help                # 查看所有命令
+novelwrite init                  # 初始化数据库
+novelwrite auth password         # 查看密码状态
+novelwrite auth password --reset # 重置密码
+novelwrite auth generate <name>  # 生成 API Key（程序调用用）
+novelwrite auth list             # 列出所有 Key
+novelwrite auth revoke <id>      # 吊销 Key
+novelwrite novel list            # 小说列表
+novelwrite novel get <id>        # 查看小说
+novelwrite novel create <title>  # 新建小说
+novelwrite roles list <novelId>  # 角色列表
+novelwrite outline get <novelId> # 查看大纲
 ```
 
 ## 项目结构
