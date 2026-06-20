@@ -57,6 +57,9 @@ async function main() {
   // 安全中间件（顺序很重要）
   app.use((_req, res, next) => {
     // CSP: 限制资源加载来源，防止 XSS
+    // connect-src 包含 API 地址和前端开发地址（跨端口时需要）
+    const apiOrigin = CORS_ORIGIN.replace(/\/$/, '')
+    const connectSrc = `connect-src 'self' ${apiOrigin} http://localhost:3002 http://localhost:5173`
     res.setHeader(
       'Content-Security-Policy',
       [
@@ -65,7 +68,7 @@ async function main() {
         "style-src 'self' 'unsafe-inline'",
         "img-src 'self' data:",
         "font-src 'self'",
-        "connect-src 'self'",
+        connectSrc,
         "frame-ancestors 'none'",
         "base-uri 'self'",
         "form-action 'self'",
