@@ -61,13 +61,13 @@ async function main() {
     const frontendOrigin = CORS_ORIGIN.replace(/\/$/, '')
     // API 自身地址（前端不通过反代时直连用）
     const apiOrigin = `http://localhost:${PORT}`
-    const origins = [...new Set(['self', frontendOrigin, apiOrigin])]
+    const origins = [...new Set(['self', frontendOrigin, apiOrigin, 'https://cloudflareinsights.com'])]
     const connectSrc = `connect-src ${origins.join(' ')}`
     res.setHeader(
       'Content-Security-Policy',
       [
         "default-src 'self'",
-        "script-src 'self'",
+        "script-src 'self' https://static.cloudflareinsights.com",
         "style-src 'self' 'unsafe-inline'",
         "img-src 'self' data:",
         "font-src 'self'",
